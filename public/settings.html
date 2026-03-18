@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cài Đặt Thương Hiệu - EVIE</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .settings-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .settings-section {
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid var(--primary);
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 0 40px rgba(0, 240, 255, 0.4);
+        }
+        
+        .settings-section h2 {
+            color: var(--gold);
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            color: var(--text);
+            margin-bottom: 8px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid rgba(0, 240, 255, 0.5);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 14px;
+        }
+        
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 20px rgba(0, 240, 255, 0.4);
+        }
+        
+        .color-picker-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        
+        .color-picker {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .color-picker input[type="color"] {
+            width: 60px;
+            height: 40px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        
+        .preview-box {
+            background: linear-gradient(135deg, rgba(0, 240, 255, 0.1), rgba(123, 47, 247, 0.1));
+            border: 2px solid var(--primary);
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .preview-logo {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+        
+        .preview-name {
+            font-size: 36px;
+            font-weight: bold;
+            background: linear-gradient(135deg, var(--gold), var(--primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+        
+        .preview-slogan {
+            color: var(--text-dim);
+            font-size: 14px;
+        }
+        
+        .btn-save {
+            background: linear-gradient(135deg, var(--success), #059669);
+            color: white;
+            border: none;
+            padding: 14px 32px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        
+        .btn-save:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(16, 185, 129, 0.5);
+        }
+        
+        .btn-reset {
+            background: var(--danger);
+            color: white;
+            border: none;
+            padding: 14px 32px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        
+        .btn-back {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            padding: 10px 20px;
+            background: var(--primary);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            z-index: 1000;
+        }
+        
+        .help-text {
+            color: var(--text-dim);
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        
+        .emoji-picker {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .emoji-option {
+            font-size: 32px;
+            padding: 10px;
+            background: rgba(0, 240, 255, 0.1);
+            border: 2px solid transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.3s;
+        }
+        
+        .emoji-option:hover,
+        .emoji-option.selected {
+            border-color: var(--primary);
+            background: rgba(0, 240, 255, 0.3);
+            transform: scale(1.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="background-animation"></div>
+    
+    <button class="btn-back" onclick="goBack()">← Quay Lại</button>
+    
+    <div class="settings-container">
+        <div style="text-align: center; margin: 40px 0;">
+            <h1 style="font-size: 48px; background: linear-gradient(135deg, var(--gold), var(--primary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                ⚙️ Cài Đặt Thương Hiệu
+            </h1>
+            <p style="color: var(--text-dim);">Tùy chỉnh giao diện theo thương hiệu của bạn</p>
+        </div>
+        
+        <!-- Preview -->
+        <div class="settings-section">
+            <h2>👁️ Xem Trước</h2>
+            <div class="preview-box">
+                <div class="preview-logo" id="previewLogo">👑</div>
+                <div class="preview-name" id="previewName">EVIE</div>
+                <div class="preview-slogan" id="previewSlogan">Xóa mã ẩn - Reset tài khoản & website</div>
+            </div>
+        </div>
+        
+        <!-- Brand Info -->
+        <div class="settings-section">
+            <h2>🏷️ Thông Tin Thương Hiệu</h2>
+            
+            <div class="form-group">
+                <label>Tên Thương Hiệu</label>
+                <input type="text" id="brandName" placeholder="EVIE" value="EVIE">
+                <div class="help-text">Tên sẽ hiển thị trên tất cả các trang</div>
+            </div>
+            
+            <div class="form-group">
+                <label>Slogan / Mô Tả</label>
+                <input type="text" id="brandSlogan" placeholder="Xóa mã ẩn - Reset tài khoản & website" value="Xóa mã ẩn - Reset tài khoản & website">
+                <div class="help-text">Mô tả ngắn gọn về dịch vụ</div>
+            </div>
+            
+            <div class="form-group">
+                <label>Năm</label>
+                <input type="number" id="brandYear" placeholder="2026" value="2026" min="2020" max="2100">
+                <div class="help-text">Năm hiển thị ở footer</div>
+            </div>
+            
+            <div class="form-group">
+                <label>Logo / Icon</label>
+                <div class="emoji-picker">
+                    <div class="emoji-option selected" data-emoji="👑" onclick="selectEmoji(this)">👑</div>
+                    <div class="emoji-option" data-emoji="⭐" onclick="selectEmoji(this)">⭐</div>
+                    <div class="emoji-option" data-emoji="🛡️" onclick="selectEmoji(this)">🛡️</div>
+                    <div class="emoji-option" data-emoji="🔒" onclick="selectEmoji(this)">🔒</div>
+                    <div class="emoji-option" data-emoji="💎" onclick="selectEmoji(this)">💎</div>
+                    <div class="emoji-option" data-emoji="🚀" onclick="selectEmoji(this)">🚀</div>
+                    <div class="emoji-option" data-emoji="⚡" onclick="selectEmoji(this)">⚡</div>
+                    <div class="emoji-option" data-emoji="🎯" onclick="selectEmoji(this)">🎯</div>
+                    <div class="emoji-option" data-emoji="🔥" onclick="selectEmoji(this)">🔥</div>
+                    <div class="emoji-option" data-emoji="💫" onclick="selectEmoji(this)">💫</div>
+                    <div class="emoji-option" data-emoji="🌟" onclick="selectEmoji(this)">🌟</div>
+                    <div class="emoji-option" data-emoji="✨" onclick="selectEmoji(this)">✨</div>
+                </div>
+                <div class="help-text">Chọn icon cho logo của bạn</div>
+            </div>
+        </div>
+        
+        <!-- Colors -->
+        <div class="settings-section">
+            <h2>🎨 Màu Sắc</h2>
+            
+            <div class="color-picker-group">
+                <div class="form-group">
+                    <label>Màu Chính (Primary)</label>
+                    <div class="color-picker">
+                        <input type="color" id="colorPrimary" value="#00f0ff">
+                        <span id="colorPrimaryText">#00f0ff</span>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Màu Phụ (Secondary)</label>
+                    <div class="color-picker">
+                        <input type="color" id="colorSecondary" value="#7b2ff7">
+                        <span id="colorSecondaryText">#7b2ff7</span>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Màu Vàng (Gold)</label>
+                    <div class="color-picker">
+                        <input type="color" id="colorGold" value="#FFD700">
+                        <span id="colorGoldText">#FFD700</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="help-text">Màu sắc sẽ áp dụng cho toàn bộ giao diện</div>
+        </div>
+        
+        <!-- Actions -->
+        <div class="settings-section">
+            <button class="btn-save" onclick="saveSettings()">💾 Lưu Cài Đặt</button>
+            <button class="btn-reset" onclick="resetSettings()">🔄 Khôi Phục Mặc Định</button>
+        </div>
+    </div>
+    
+    <script>
+        const API_URL = 'https://evie-system.vercel.app/api';
+        let selectedEmoji = '👑';
+        
+        // Load settings on page load
+        window.addEventListener('load', loadSettings);
+        
+        function loadSettings() {
+            const settings = JSON.parse(localStorage.getItem('brandSettings') || '{}');
+            
+            if (settings.name) document.getElementById('brandName').value = settings.name;
+            if (settings.slogan) document.getElementById('brandSlogan').value = settings.slogan;
+            if (settings.year) document.getElementById('brandYear').value = settings.year;
+            if (settings.logo) {
+                selectedEmoji = settings.logo;
+                document.querySelectorAll('.emoji-option').forEach(el => {
+                    el.classList.toggle('selected', el.dataset.emoji === selectedEmoji);
+                });
+            }
+            if (settings.colors) {
+                if (settings.colors.primary) document.getElementById('colorPrimary').value = settings.colors.primary;
+                if (settings.colors.secondary) document.getElementById('colorSecondary').value = settings.colors.secondary;
+                if (settings.colors.gold) document.getElementById('colorGold').value = settings.colors.gold;
+            }
+            
+            updatePreview();
+            setupColorPickers();
+        }
+        
+        function setupColorPickers() {
+            ['Primary', 'Secondary', 'Gold'].forEach(color => {
+                const input = document.getElementById('color' + color);
+                const text = document.getElementById('color' + color + 'Text');
+                
+                input.addEventListener('input', function() {
+                    text.textContent = this.value;
+                    updatePreview();
+                });
+            });
+        }
+        
+        function selectEmoji(element) {
+            document.querySelectorAll('.emoji-option').forEach(el => el.classList.remove('selected'));
+            element.classList.add('selected');
+            selectedEmoji = element.dataset.emoji;
+            updatePreview();
+        }
+        
+        function updatePreview() {
+            const name = document.getElementById('brandName').value || 'EVIE';
+            const slogan = document.getElementById('brandSlogan').value || 'Xóa mã ẩn - Reset tài khoản & website';
+            
+            document.getElementById('previewName').textContent = name;
+            document.getElementById('previewSlogan').textContent = slogan;
+            document.getElementById('previewLogo').textContent = selectedEmoji;
+            
+            // Apply colors to preview
+            const primary = document.getElementById('colorPrimary').value;
+            const gold = document.getElementById('colorGold').value;
+            
+            document.getElementById('previewName').style.background = `linear-gradient(135deg, ${gold}, ${primary})`;
+            document.getElementById('previewName').style.webkitBackgroundClip = 'text';
+            document.getElementById('previewName').style.webkitTextFillColor = 'transparent';
+        }
+        
+        // Auto update preview
+        ['brandName', 'brandSlogan'].forEach(id => {
+            document.getElementById(id).addEventListener('input', updatePreview);
+        });
+        
+        function saveSettings() {
+            const settings = {
+                name: document.getElementById('brandName').value,
+                slogan: document.getElementById('brandSlogan').value,
+                year: document.getElementById('brandYear').value,
+                logo: selectedEmoji,
+                colors: {
+                    primary: document.getElementById('colorPrimary').value,
+                    secondary: document.getElementById('colorSecondary').value,
+                    gold: document.getElementById('colorGold').value
+                }
+            };
+            
+            localStorage.setItem('brandSettings', JSON.stringify(settings));
+            
+            showNotification('✅ Đã lưu cài đặt thành công!', 'success');
+            
+            // Apply immediately
+            applySettings(settings);
+        }
+        
+        function applySettings(settings) {
+            // Apply to current page
+            document.title = `${settings.name} - Cài Đặt`;
+            
+            // Apply colors
+            const root = document.documentElement;
+            root.style.setProperty('--primary', settings.colors.primary);
+            root.style.setProperty('--secondary', settings.colors.secondary);
+            root.style.setProperty('--gold', settings.colors.gold);
+        }
+        
+        function resetSettings() {
+            if (!confirm('Bạn có chắc muốn khôi phục cài đặt mặc định?')) return;
+            
+            localStorage.removeItem('brandSettings');
+            
+            document.getElementById('brandName').value = 'EVIE';
+            document.getElementById('brandSlogan').value = 'Xóa mã ẩn - Reset tài khoản & website';
+            document.getElementById('brandYear').value = '2026';
+            document.getElementById('colorPrimary').value = '#00f0ff';
+            document.getElementById('colorSecondary').value = '#7b2ff7';
+            document.getElementById('colorGold').value = '#FFD700';
+            
+            selectedEmoji = '👑';
+            document.querySelectorAll('.emoji-option').forEach(el => {
+                el.classList.toggle('selected', el.dataset.emoji === '👑');
+            });
+            
+            updatePreview();
+            setupColorPickers();
+            
+            showNotification('✅ Đã khôi phục cài đặt mặc định!', 'success');
+        }
+        
+        function goBack() {
+            const role = localStorage.getItem('adminRole');
+            if (role === 'admin') {
+                window.location.href = 'superadmin.html';
+            } else {
+                window.location.href = 'admin.html';
+            }
+        }
+        
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            const bgColor = type === 'success' ? 'var(--success)' : 'var(--danger)';
+            
+            notification.style.cssText = `
+                position: fixed;
+                top: 80px;
+                right: 20px;
+                padding: 15px 25px;
+                background: ${bgColor};
+                color: white;
+                border-radius: 10px;
+                box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+                z-index: 10000;
+                font-weight: 600;
+            `;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => notification.remove(), 3000);
+        }
+    </script>
+</body>
+</html>
