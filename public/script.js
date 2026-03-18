@@ -1,5 +1,5 @@
 // API Configuration
-const API_URL = 'http://localhost:3000/api';
+const API_URL = 'https://evie-system.vercel.app/api';
 
 // Get API key from localStorage (if user is logged in)
 function getApiKey() {
