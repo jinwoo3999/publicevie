@@ -5,10 +5,8 @@ const rateLimit = require('express-rate-limit');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
-require('dotenv').config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
 // Security middleware
 app.use(helmet({
@@ -22,7 +20,6 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key']
 }));
 app.use(express.json());
-app.use(express.static('public'));
 
 // Rate limiting
 const limiter = rateLimit({
@@ -31,11 +28,11 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-// In-memory database (replace with MongoDB/PostgreSQL in production)
+// In-memory database
 const users = new Map();
 const apiKeys = new Map();
-const userWebsites = new Map(); // userId -> Set of websites
-const userAccounts = new Map(); // userId -> Set of accounts
+const userWebsites = new Map();
+const userAccounts = new Map();
 
 // Initialize admin user
 const ADMIN_ID = 'admin';
@@ -48,7 +45,6 @@ users.set(ADMIN_ID, {
     createdAt: new Date()
 });
 
-// Admin default websites
 userWebsites.set(ADMIN_ID, new Set([
     'ok168.pro',
     'ok168.com',
@@ -68,7 +64,7 @@ function generateApiKey() {
     return crypto.randomBytes(32).toString('hex');
 }
 
-function createApiKey(userId, expiresIn = 24 * 60 * 60 * 1000) { // 24 hours
+function createApiKey(userId, expiresIn = 24 * 60 * 60 * 1000) {
     const key = generateApiKey();
     const expiresAt = new Date(Date.now() + expiresIn);
     
@@ -92,17 +88,6 @@ function validateApiKey(key) {
     
     return keyData;
 }
-
-// Auto-cleanup expired keys every hour
-setInterval(() => {
-    const now = new Date();
-    for (const [key, data] of apiKeys.entries()) {
-        if (now > data.expiresAt) {
-            apiKeys.delete(key);
-            console.log(`🗑️  Expired API key deleted: ${key.substring(0, 8)}...`);
-        }
-    }
-}, 60 * 60 * 1000);
 
 // JWT middleware
 const authenticateToken = (req, res, next) => {
@@ -150,7 +135,6 @@ const requireAdmin = (req, res, next) => {
 
 // ============ AUTH ENDPOINTS ============
 
-// Register
 app.post('/api/auth/register', async (req, res) => {
     try {
         const { username, password } = req.body;
@@ -159,7 +143,6 @@ app.post('/api/auth/register', async (req, res) => {
             return res.status(400).json({ error: 'Username and password required' });
         }
 
-        // Check if username exists
         for (const user of users.values()) {
             if (user.username === username) {
                 return res.status(400).json({ error: 'Username already exists' });
@@ -177,7 +160,6 @@ app.post('/api/auth/register', async (req, res) => {
             createdAt: new Date()
         });
 
-        // Initialize empty lists
         userWebsites.set(userId, new Set());
         userAccounts.set(userId, new Set());
 
@@ -197,7 +179,6 @@ app.post('/api/auth/register', async (req, res) => {
     }
 });
 
-// Login
 app.post('/api/auth/login', async (req, res) => {
     try {
         const { username, password } = req.body;
@@ -235,7 +216,6 @@ app.post('/api/auth/login', async (req, res) => {
     }
 });
 
-// Generate API Key (requires JWT)
 app.post('/api/auth/generate-key', authenticateToken, (req, res) => {
     const { key, expiresAt } = createApiKey(req.user.id);
     
@@ -247,30 +227,13 @@ app.post('/api/auth/generate-key', authenticateToken, (req, res) => {
     });
 });
 
-// Get my API keys
-app.get('/api/auth/my-keys', authenticateToken, (req, res) => {
-    const myKeys = [];
-    for (const [key, data] of apiKeys.entries()) {
-        if (data.userId === req.user.id) {
-            myKeys.push({
-                key: key.substring(0, 8) + '...',
-                createdAt: data.createdAt,
-                expiresAt: data.expiresAt
-            });
-        }
-    }
-    res.json({ success: true, keys: myKeys });
-});
-
 // ============ WEBSITE MANAGEMENT ============
 
-// Get my websites
 app.get('/api/websites', authenticateApiKey, (req, res) => {
     const websites = Array.from(userWebsites.get(req.userId) || []);
     res.json({ success: true, websites });
 });
 
-// Add website
 app.post('/api/websites', authenticateApiKey, (req, res) => {
     const { domain } = req.body;
     
@@ -289,7 +252,6 @@ app.post('/api/websites', authenticateApiKey, (req, res) => {
     res.json({ success: true, message: 'Website added', domain: normalizedDomain });
 });
 
-// Remove website
 app.delete('/api/websites/:domain', authenticateApiKey, (req, res) => {
     const domain = req.params.domain.toLowerCase();
     
@@ -302,13 +264,11 @@ app.delete('/api/websites/:domain', authenticateApiKey, (req, res) => {
 
 // ============ ACCOUNT MANAGEMENT ============
 
-// Get my accounts
 app.get('/api/accounts', authenticateApiKey, (req, res) => {
     const accounts = Array.from(userAccounts.get(req.userId) || []);
     res.json({ success: true, accounts });
 });
 
-// Add account
 app.post('/api/accounts', authenticateApiKey, (req, res) => {
     const { account } = req.body;
     
@@ -327,7 +287,6 @@ app.post('/api/accounts', authenticateApiKey, (req, res) => {
     res.json({ success: true, message: 'Account added', account: normalizedAccount });
 });
 
-// Remove account
 app.delete('/api/accounts/:account', authenticateApiKey, (req, res) => {
     const account = req.params.account.toLowerCase();
     
@@ -340,7 +299,6 @@ app.delete('/api/accounts/:account', authenticateApiKey, (req, res) => {
 
 // ============ CHECK ENDPOINTS ============
 
-// Check website
 app.post('/api/check-website', authenticateApiKey, async (req, res) => {
     try {
         const { url } = req.body;
@@ -375,7 +333,6 @@ app.post('/api/check-website', authenticateApiKey, async (req, res) => {
     }
 });
 
-// Check account
 app.post('/api/check-account', authenticateApiKey, async (req, res) => {
     try {
         const { account } = req.body;
@@ -401,7 +358,6 @@ app.post('/api/check-account', authenticateApiKey, async (req, res) => {
     }
 });
 
-// Clean hidden code
 app.post('/api/clean', authenticateApiKey, async (req, res) => {
     try {
         const { value, type } = req.body;
@@ -430,7 +386,6 @@ app.post('/api/clean', authenticateApiKey, async (req, res) => {
 
 // ============ ADMIN ENDPOINTS ============
 
-// Get all users (admin only)
 app.get('/api/admin/users', authenticateToken, requireAdmin, (req, res) => {
     const userList = Array.from(users.values()).map(u => ({
         id: u.id,
@@ -444,7 +399,6 @@ app.get('/api/admin/users', authenticateToken, requireAdmin, (req, res) => {
     res.json({ success: true, users: userList });
 });
 
-// Reset user password (admin only)
 app.post('/api/admin/reset-password', authenticateToken, requireAdmin, async (req, res) => {
     const { userId, newPassword } = req.body;
     
@@ -464,7 +418,6 @@ app.post('/api/admin/reset-password', authenticateToken, requireAdmin, async (re
     res.json({ success: true, message: 'Password reset successfully' });
 });
 
-// Delete user (admin only)
 app.delete('/api/admin/users/:userId', authenticateToken, requireAdmin, (req, res) => {
     const { userId } = req.params;
     
@@ -476,7 +429,6 @@ app.delete('/api/admin/users/:userId', authenticateToken, requireAdmin, (req, re
     userWebsites.delete(userId);
     userAccounts.delete(userId);
     
-    // Delete user's API keys
     for (const [key, data] of apiKeys.entries()) {
         if (data.userId === userId) {
             apiKeys.delete(key);
@@ -498,12 +450,4 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-app.listen(PORT, () => {
-    console.log(`🚀 EVIE Backend running on port ${PORT}`);
-    console.log(`👤 Admin username: admin`);
-    console.log(`🔑 Admin password: ${process.env.ADMIN_PASSWORD || 'admin123'}`);
-    console.log(`⏰ API keys auto-expire after 24 hours`);
-});
-
-// Export app for Vercel
 module.exports = app;
