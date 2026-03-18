@@ -45,9 +45,29 @@ users.set(ADMIN_ID, {
     createdAt: new Date()
 });
 
-// Initialize default user
-const USER_ID = '1ec168';
-const userPassword = bcrypt.hashSync('123456', 10);
+// Initialize default users
+const defaultUsers = [
+    { username: '1ec168', password: '123456', role: 'user' },
+    { username: 'user1', password: '123456', role: 'user' },
+    { username: 'user2', password: '123456', role: 'user' }
+];
+
+defaultUsers.forEach(userData => {
+    const userId = userData.username;
+    const hashedPassword = bcrypt.hashSync(userData.password, 10);
+    
+    users.set(userId, {
+        id: userId,
+        username: userData.username,
+        password: hashedPassword,
+        role: userData.role,
+        createdAt: new Date()
+    });
+    
+    // Initialize empty lists for each user
+    userWebsites.set(userId, new Set());
+    userAccounts.set(userId, new Set());
+});
 users.set(USER_ID, {
     id: USER_ID,
     username: '1ec168',
