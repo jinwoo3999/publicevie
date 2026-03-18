@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EVIE Quick Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        
+        .status {
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-weight: 600;
+        }
+        
+        .status.success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 2px solid #10b981;
+        }
+        
+        .status.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 2px solid #ef4444;
+        }
+        
+        .test-section {
+            margin: 30px 0;
+            padding: 20px;
+            background: #f9fafb;
+            border-radius: 10px;
+        }
+        
+        .test-section h3 {
+            color: #374151;
+            margin-bottom: 15px;
+        }
+        
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            margin: 5px;
+        }
+        
+        button:hover {
+            background: #5568d3;
+        }
+        
+        button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        
+        input {
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 14px;
+            width: 300px;
+            margin-right: 10px;
+        }
+        
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            border: 2px solid #e5e7eb;
+        }
+        
+        .result pre {
+            background: #1f2937;
+            color: #10b981;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+        
+        .links {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+        
+        .links a {
+            background: #764ba2;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        
+        .links a:hover {
+            background: #5f3a82;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 EVIE Quick Test</h1>
+        <p style="color: #6b7280; margin-bottom: 20px;">Test nhanh các tính năng của EVIE</p>
+        
+        <div id="serverStatus" class="status">
+            Đang kiểm tra server...
+        </div>
+        
+        <!-- Test 1: Health Check -->
+        <div class="test-section">
+            <h3>1. Health Check</h3>
+            <button onclick="testHealth()">Test Server Health</button>
+            <div id="healthResult" class="result" style="display: none;"></div>
+        </div>
+        
+        <!-- Test 2: Check Website -->
+        <div class="test-section">
+            <h3>2. Check Website (Public)</h3>
+            <input type="text" id="websiteInput" placeholder="ok168.pro" value="ok168.pro">
+            <button onclick="testWebsite()">Test Check</button>
+            <div id="websiteResult" class="result" style="display: none;"></div>
+        </div>
+        
+        <!-- Test 3: Check Account -->
+        <div class="test-section">
+            <h3>3. Check Account (Public)</h3>
+            <input type="text" id="accountInput" placeholder="admin123" value="admin123">
+            <button onclick="testAccount()">Test Check</button>
+            <div id="accountResult" class="result" style="display: none;"></div>
+        </div>
+        
+        <!-- Test 4: Login -->
+        <div class="test-section">
+            <h3>4. Login Test</h3>
+            <input type="text" id="loginUsername" placeholder="admin" value="admin">
+            <input type="password" id="loginPassword" placeholder="admin123" value="admin123">
+            <button onclick="testLogin()">Test Login</button>
+            <div id="loginResult" class="result" style="display: none;"></div>
+        </div>
+        
+        <!-- Quick Links -->
+        <div class="test-section">
+            <h3>🔗 Quick Links</h3>
+            <div class="links">
+                <a href="index.html" target="_blank">Trang Chính</a>
+                <a href="login.html" target="_blank">Đăng Nhập</a>
+                <a href="superadmin.html" target="_blank">SuperAdmin</a>
+                <a href="admin.html" target="_blank">User Panel</a>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const API_URL = 'http://localhost:3000/api';
+        
+        // Check server on load
+        window.addEventListener('load', async () => {
+            try {
+                const response = await fetch(`${API_URL}/health`);
+                const data = await response.json();
+                
+                if (data.status === 'OK') {
+                    document.getElementById('serverStatus').className = 'status success';
+                    document.getElementById('serverStatus').innerHTML = `
+                        ✅ Server đang chạy!<br>
+                        <small>Users: ${data.stats.users} | API Keys: ${data.stats.activeApiKeys}</small>
+                    `;
+                } else {
+                    throw new Error('Server not OK');
+                }
+            } catch (error) {
+                document.getElementById('serverStatus').className = 'status error';
+                document.getElementById('serverStatus').textContent = '❌ Server không chạy! Chạy: npm run dev';
+            }
+        });
+        
+        async function testHealth() {
+            const resultDiv = document.getElementById('healthResult');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = 'Đang test...';
+            
+            try {
+                const response = await fetch(`${API_URL}/health`);
+                const data = await response.json();
+                
+                resultDiv.innerHTML = `
+                    <strong>✅ Success!</strong>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `<strong>❌ Error:</strong> ${error.message}`;
+            }
+        }
+        
+        async function testWebsite() {
+            const resultDiv = document.getElementById('websiteResult');
+            const url = document.getElementById('websiteInput').value;
+            
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = 'Đang test...';
+            
+            try {
+                // Try with API key if available
+                const apiKey = localStorage.getItem('adminApiKey');
+                const headers = {
+                    'Content-Type': 'application/json'
+                };
+                
+                if (apiKey) {
+                    headers['X-API-Key'] = apiKey;
+                }
+                
+                const response = await fetch(`${API_URL}/check-website`, {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify({ url })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <strong>✅ Success!</strong>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                        ${data.isAllowed ? 
+                            '<p style="color: green; font-weight: bold;">✓ Website trong danh sách!</p>' : 
+                            '<p style="color: red; font-weight: bold;">✗ Website KHÔNG trong danh sách!</p>'
+                        }
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <strong>⚠️ Response:</strong>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<strong>❌ Error:</strong> ${error.message}`;
+            }
+        }
+        
+        async function testAccount() {
+            const resultDiv = document.getElementById('accountResult');
+            const account = document.getElementById('accountInput').value;
+            
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = 'Đang test...';
+            
+            try {
+                const apiKey = localStorage.getItem('adminApiKey');
+                const headers = {
+                    'Content-Type': 'application/json'
+                };
+                
+                if (apiKey) {
+                    headers['X-API-Key'] = apiKey;
+                }
+                
+                const response = await fetch(`${API_URL}/check-account`, {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify({ account })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <strong>✅ Success!</strong>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                        ${data.isAllowed ? 
+                            '<p style="color: green; font-weight: bold;">✓ Tài khoản hợp lệ!</p>' : 
+                            '<p style="color: red; font-weight: bold;">✗ Tài khoản KHÔNG hợp lệ!</p>'
+                        }
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <strong>⚠️ Response:</strong>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<strong>❌ Error:</strong> ${error.message}`;
+            }
+        }
+        
+        async function testLogin() {
+            const resultDiv = document.getElementById('loginResult');
+            const username = document.getElementById('loginUsername').value;
+            const password = document.getElementById('loginPassword').value;
+            
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = 'Đang test...';
+            
+            try {
+                const response = await fetch(`${API_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Generate API key
+                    const keyResponse = await fetch(`${API_URL}/auth/generate-key`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${data.token}`
+                        }
+                    });
+                    
+                    const keyData = await keyResponse.json();
+                    
+                    // Save to localStorage
+                    localStorage.setItem('adminToken', data.token);
+                    localStorage.setItem('adminApiKey', keyData.apiKey);
+                    
+                    resultDiv.innerHTML = `
+                        <strong>✅ Login Success!</strong>
+                        <pre>${JSON.stringify({
+                            user: data.user,
+                            token: data.token.substring(0, 20) + '...',
+                            apiKey: keyData.apiKey.substring(0, 20) + '...'
+                        }, null, 2)}</pre>
+                        <p style="color: green; font-weight: bold;">✓ Token và API key đã lưu vào localStorage!</p>
+                        <p>Bây giờ bạn có thể test lại Check Website/Account với API key</p>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <strong>❌ Login Failed!</strong>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<strong>❌ Error:</strong> ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>

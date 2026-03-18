@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hướng Dẫn Sử Dụng EVIE</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .guide-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        
+        .guide-section {
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid var(--primary);
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+        
+        .guide-section h2 {
+            color: var(--gold);
+            margin-bottom: 20px;
+        }
+        
+        .guide-section h3 {
+            color: var(--primary);
+            margin: 20px 0 10px 0;
+        }
+        
+        .guide-section p, .guide-section li {
+            color: var(--text);
+            line-height: 1.8;
+            margin: 10px 0;
+        }
+        
+        .guide-section ol, .guide-section ul {
+            margin-left: 20px;
+        }
+        
+        .highlight {
+            background: rgba(0, 240, 255, 0.2);
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: var(--primary);
+            font-weight: 600;
+        }
+        
+        .warning {
+            background: rgba(239, 68, 68, 0.2);
+            border-left: 4px solid var(--danger);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        
+        .tip {
+            background: rgba(16, 185, 129, 0.2);
+            border-left: 4px solid var(--success);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        
+        .back-btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border: none;
+            border-radius: 8px;
+            color: white;
+            text-decoration: none;
+            font-weight: 600;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="background-animation"></div>
+    
+    <div class="guide-container">
+        <div style="text-align: center; margin-bottom: 40px;">
+            <h1 style="font-size: 48px; background: linear-gradient(135deg, var(--gold), var(--primary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                📖 Hướng Dẫn Sử Dụng EVIE
+            </h1>
+            <p style="color: var(--text-dim);">Dành cho người không biết IT</p>
+        </div>
+        
+        <!-- Đăng Nhập -->
+        <div class="guide-section">
+            <h2>🔐 Bước 1: Đăng Nhập</h2>
+            <ol>
+                <li>Mở trình duyệt và vào: <span class="highlight">http://localhost:3000/login.html</span></li>
+                <li>Nhập <strong>Tên đăng nhập</strong> và <strong>Mật khẩu</strong> mà SuperAdmin đã cấp cho bạn</li>
+                <li>Nhấn nút <span class="highlight">Đăng Nhập</span></li>
+            </ol>
+            
+            <div class="tip">
+                💡 <strong>Lưu ý:</strong> Giữ mật khẩu bí mật, không chia sẻ cho người khác!
+            </div>
+        </div>
+        
+        <!-- Quản Lý Website -->
+        <div class="guide-section">
+            <h2>🌐 Bước 2: Thêm Website</h2>
+            <p>Sau khi đăng nhập, bạn sẽ thấy trang quản lý của mình.</p>
+            
+            <h3>Thêm website mới:</h3>
+            <ol>
+                <li>Tìm phần <span class="highlight">Quản Lý Websites</span></li>
+                <li>Nhập tên website vào ô (ví dụ: <code>ok168.pro</code>)</li>
+                <li>Nhấn nút <span class="highlight">Thêm Website</span></li>
+                <li>Website sẽ xuất hiện trong danh sách bên dưới</li>
+            </ol>
+            
+            <h3>Xóa website:</h3>
+            <ol>
+                <li>Tìm website trong danh sách</li>
+                <li>Nhấn nút <span class="highlight">Xóa</span> màu đỏ</li>
+                <li>Website sẽ bị xóa khỏi danh sách</li>
+            </ol>
+        </div>
+        
+        <!-- Quản Lý Tài Khoản -->
+        <div class="guide-section">
+            <h2>👤 Bước 3: Thêm Tài Khoản</h2>
+            
+            <h3>Thêm tài khoản mới:</h3>
+            <ol>
+                <li>Tìm phần <span class="highlight">Quản Lý Tài Khoản</span></li>
+                <li>Nhập tên tài khoản vào ô (ví dụ: <code>customer123</code>)</li>
+                <li>Nhấn nút <span class="highlight">Thêm Tài Khoản</span></li>
+                <li>Tài khoản sẽ xuất hiện trong danh sách</li>
+            </ol>
+            
+            <h3>Xóa tài khoản:</h3>
+            <ol>
+                <li>Tìm tài khoản trong danh sách</li>
+                <li>Nhấn nút <span class="highlight">Xóa</span> màu đỏ</li>
+            </ol>
+        </div>
+        
+        <!-- Sử Dụng Tool -->
+        <div class="guide-section">
+            <h2>🔍 Bước 4: Sử Dụng Tool Check</h2>
+            <p>Sau khi thêm website/tài khoản, bạn có thể check:</p>
+            
+            <ol>
+                <li>Vào trang chính: <span class="highlight">http://localhost:3000</span></li>
+                <li>Chọn tab <strong>Website</strong> hoặc <strong>Tài Khoản</strong></li>
+                <li>Nhập URL hoặc tên tài khoản</li>
+                <li>Nhấn <span class="highlight">Quét</span></li>
+                <li>Nếu trong danh sách của bạn → Hiện nút <span class="highlight">Xóa Mã Ẩn</span></li>
+                <li>Nhấn <span class="highlight">Xóa Mã Ẩn</span> để xem tỉ lệ nổ</li>
+            </ol>
+            
+            <div class="tip">
+                ✅ <strong>Kết quả:</strong> Chỉ website/tài khoản trong danh sách của BẠN mới check thành công!
+            </div>
+        </div>
+        
+        <!-- Lưu Ý -->
+        <div class="guide-section">
+            <h2>⚠️ Lưu Ý Quan Trọng</h2>
+            
+            <div class="warning">
+                <strong>🔒 Bảo mật:</strong>
+                <ul>
+                    <li>Không chia sẻ mật khẩu cho người khác</li>
+                    <li>Đăng xuất sau khi sử dụng xong</li>
+                    <li>Mỗi người chỉ thấy danh sách của mình</li>
+                </ul>
+            </div>
+            
+            <div class="tip">
+                <strong>💡 Mẹo:</strong>
+                <ul>
+                    <li>Danh sách của bạn hoàn toàn riêng tư</li>
+                    <li>Bạn có thể thêm/xóa bất cứ lúc nào</li>
+                    <li>Không giới hạn số lượng website/tài khoản</li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Liên Hệ -->
+        <div class="guide-section">
+            <h2>📞 Cần Hỗ Trợ?</h2>
+            <p>Nếu gặp vấn đề, liên hệ SuperAdmin để được hỗ trợ:</p>
+            <ul>
+                <li>Quên mật khẩu → SuperAdmin reset cho bạn</li>
+                <li>Không đăng nhập được → Kiểm tra tên đăng nhập/mật khẩu</li>
+                <li>Lỗi khác → Liên hệ SuperAdmin</li>
+            </ul>
+        </div>
+        
+        <div style="text-align: center;">
+            <a href="login.html" class="back-btn">← Quay lại Đăng Nhập</a>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EVIE SuperAdmin</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .admin-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .admin-section {
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid var(--primary);
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 0 40px rgba(0, 240, 255, 0.4);
+        }
+        
+        .admin-section h2 {
+            color: var(--gold);
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+        
+        .user-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .user-card {
+            background: linear-gradient(135deg, rgba(0, 240, 255, 0.1), rgba(123, 47, 247, 0.1));
+            border: 2px solid rgba(0, 240, 255, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            position: relative;
+        }
+        
+        .user-card h3 {
+            color: var(--primary);
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+        
+        .user-info {
+            color: var(--text-dim);
+            font-size: 13px;
+            margin: 5px 0;
+        }
+        
+        .user-stats {
+            display: flex;
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .stat-badge {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+        }
+        
+        .user-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .btn-small {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+        
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .create-user-form {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr auto;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .create-user-form input {
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid rgba(0, 240, 255, 0.5);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 14px;
+        }
+        
+        .create-user-form button {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, var(--success), #059669);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        
+        .logout-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background: var(--danger);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            z-index: 1000;
+        }
+        
+        .stats-overview {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.2), rgba(0, 240, 255, 0.2));
+            border: 2px solid var(--gold);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 36px;
+            font-weight: bold;
+            color: var(--gold);
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            color: var(--text-dim);
+            font-size: 14px;
+        }
+        
+        .role-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+        
+        .role-superadmin {
+            background: var(--gold);
+            color: #000;
+        }
+        
+        .role-user {
+            background: var(--primary);
+            color: #000;
+        }
+    </style>
+</head>
+<body>
+    <div class="background-animation"></div>
+    
+    <button class="logout-btn" onclick="logout()">Đăng Xuất</button>
+    
+    <div class="admin-container">
+        <div style="text-align: center; margin: 40px 0;">
+            <h1 style="font-size: 48px; background: linear-gradient(135deg, var(--gold), var(--primary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                👑 EVIE SuperAdmin
+            </h1>
+            <p style="color: var(--text-dim);">Quản lý người dùng và phân quyền</p>
+        </div>
+        
+        <!-- Stats Overview -->
+        <div class="stats-overview">
+            <div class="stat-card">
+                <div class="stat-number" id="totalUsers">0</div>
+                <div class="stat-label">Tổng Users</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="totalWebsites">0</div>
+                <div class="stat-label">Tổng Websites</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="totalAccounts">0</div>
+                <div class="stat-label">Tổng Tài Khoản</div>
+            </div>
+        </div>
+        
+        <!-- Create User -->
+        <div class="admin-section">
+            <h2>➕ Tạo Tài Khoản Mới</h2>
+            <div class="create-user-form">
+                <input type="text" id="newUsername" placeholder="Tên đăng nhập">
+                <input type="password" id="newPassword" placeholder="Mật khẩu">
+                <input type="text" id="newDisplayName" placeholder="Tên hiển thị">
+                <button onclick="createUser()">Tạo User</button>
+            </div>
+            <p style="color: var(--text-dim); font-size: 13px; margin-top: 10px;">
+                💡 Mỗi user sẽ có tài khoản riêng để quản lý danh sách website/tài khoản của họ
+            </p>
+        </div>
+        
+        <!-- Users List -->
+        <div class="admin-section">
+            <h2>👥 Danh Sách Users</h2>
+            <div class="user-grid" id="usersList"></div>
+        </div>
+    </div>
+    
+    <script>
+        const API_URL = 'http://localhost:3000/api';
+        let token = localStorage.getItem('adminToken');
+        
+        // Check if logged in
+        if (!token) {
+            alert('Vui lòng đăng nhập trước!');
+            window.location.href = 'login.html';
+        }
+        
+        // Verify token is valid
+        fetch(`${API_URL}/admin/users`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        }).then(res => {
+            if (!res.ok) {
+                alert('Phiên đăng nhập hết hạn, vui lòng đăng nhập lại!');
+                localStorage.clear();
+                window.location.href = 'login.html';
+            }
+        });
+        
+        loadUsers();
+        
+        async function loadUsers() {
+            try {
+                const response = await fetch(`${API_URL}/admin/users`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (!response.ok) throw new Error('Unauthorized');
+                
+                const data = await response.json();
+                const usersList = document.getElementById('usersList');
+                usersList.innerHTML = '';
+                
+                let totalWebsites = 0;
+                let totalAccounts = 0;
+                
+                data.users.forEach(user => {
+                    totalWebsites += user.websiteCount || 0;
+                    totalAccounts += user.accountCount || 0;
+                    
+                    const card = document.createElement('div');
+                    card.className = 'user-card';
+                    card.innerHTML = `
+                        <h3>
+                            ${user.username}
+                            <span class="role-badge role-${user.role}">${user.role.toUpperCase()}</span>
+                        </h3>
+                        <div class="user-info">ID: ${user.id}</div>
+                        <div class="user-info">Tạo: ${new Date(user.createdAt).toLocaleDateString('vi-VN')}</div>
+                        <div class="user-stats">
+                            <div class="stat-badge">🌐 ${user.websiteCount || 0} websites</div>
+                            <div class="stat-badge">👤 ${user.accountCount || 0} accounts</div>
+                        </div>
+                        <div class="user-actions">
+                            ${user.role !== 'admin' ? `
+                                <button class="btn-small btn-primary" onclick="resetPassword('${user.id}', '${user.username}')">
+                                    🔑 Reset MK
+                                </button>
+                                <button class="btn-small btn-danger" onclick="deleteUser('${user.id}', '${user.username}')">
+                                    🗑️ Xóa
+                                </button>
+                            ` : '<span style="color: var(--gold); font-size: 12px;">👑 SuperAdmin</span>'}
+                        </div>
+                    `;
+                    usersList.appendChild(card);
+                });
+                
+                document.getElementById('totalUsers').textContent = data.users.length;
+                document.getElementById('totalWebsites').textContent = totalWebsites;
+                document.getElementById('totalAccounts').textContent = totalAccounts;
+                
+            } catch (error) {
+                alert('Lỗi: ' + error.message);
+                logout();
+            }
+        }
+        
+        async function createUser() {
+            const username = document.getElementById('newUsername').value.trim();
+            const password = document.getElementById('newPassword').value.trim();
+            const displayName = document.getElementById('newDisplayName').value.trim();
+            
+            if (!username || !password) {
+                alert('Vui lòng nhập tên đăng nhập và mật khẩu');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password, displayName })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('newUsername').value = '';
+                    document.getElementById('newPassword').value = '';
+                    document.getElementById('newDisplayName').value = '';
+                    
+                    showNotification(`✓ Đã tạo user: ${username}`, 'success');
+                    
+                    // Show credentials
+                    alert(`✅ Tạo tài khoản thành công!\n\nTên đăng nhập: ${username}\nMật khẩu: ${password}\n\nGửi thông tin này cho user để họ đăng nhập.`);
+                    
+                    loadUsers();
+                } else {
+                    alert('Lỗi: ' + data.error);
+                }
+            } catch (error) {
+                alert('Lỗi: ' + error.message);
+            }
+        }
+        
+        async function resetPassword(userId, username) {
+            const newPassword = prompt(`Nhập mật khẩu mới cho user: ${username}`);
+            
+            if (!newPassword) return;
+            
+            try {
+                const response = await fetch(`${API_URL}/admin/reset-password`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ userId, newPassword })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert(`✅ Đã reset mật khẩu!\n\nUser: ${username}\nMật khẩu mới: ${newPassword}\n\nGửi thông tin này cho user.`);
+                    showNotification('✓ Đã reset mật khẩu', 'success');
+                } else {
+                    alert('Lỗi: ' + data.error);
+                }
+            } catch (error) {
+                alert('Lỗi: ' + error.message);
+            }
+        }
+        
+        async function deleteUser(userId, username) {
+            if (!confirm(`Xóa user: ${username}?\n\nTất cả dữ liệu của user này sẽ bị xóa!`)) return;
+            
+            try {
+                const response = await fetch(`${API_URL}/admin/users/${userId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showNotification('✓ Đã xóa user', 'success');
+                    loadUsers();
+                } else {
+                    alert('Lỗi: ' + data.error);
+                }
+            } catch (error) {
+                alert('Lỗi: ' + error.message);
+            }
+        }
+        
+        function logout() {
+            localStorage.removeItem('adminToken');
+            localStorage.removeItem('adminApiKey');
+            window.location.href = 'login.html';
+        }
+        
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            const bgColor = type === 'success' ? 'var(--success)' : 'var(--danger)';
+            
+            notification.style.cssText = `
+                position: fixed;
+                top: 80px;
+                right: 20px;
+                padding: 15px 25px;
+                background: ${bgColor};
+                color: white;
+                border-radius: 10px;
+                box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+                z-index: 10000;
+                font-weight: 600;
+            `;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => notification.remove(), 3000);
+        }
+    </script>
+</body>
+</html>
