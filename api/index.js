@@ -45,6 +45,17 @@ users.set(ADMIN_ID, {
     createdAt: new Date()
 });
 
+// Initialize default user
+const USER_ID = '1ec168';
+const userPassword = bcrypt.hashSync('123456', 10);
+users.set(USER_ID, {
+    id: USER_ID,
+    username: '1ec168',
+    password: userPassword,
+    role: 'user',
+    createdAt: new Date()
+});
+
 userWebsites.set(ADMIN_ID, new Set([
     'ok168.pro',
     'ok168.com',
@@ -57,6 +68,15 @@ userAccounts.set(ADMIN_ID, new Set([
     'user001',
     'vip888',
     'test123'
+]));
+
+// Initialize user data
+userWebsites.set(USER_ID, new Set([
+    'ok168.pro'
+]));
+
+userAccounts.set(USER_ID, new Set([
+    'admin123'
 ]));
 
 // API Key management
