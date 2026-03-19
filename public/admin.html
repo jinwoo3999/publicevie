@@ -191,12 +191,36 @@
             window.location.href = 'login.html';
         }
         
+        // Verify API key is still valid
+        async function verifyApiKey() {
+            try {
+                const response = await fetch(`${API_URL}/websites`, {
+                    headers: { 'X-API-Key': apiKey }
+                });
+                
+                if (!response.ok) {
+                    console.log('API key invalid, redirecting to login');
+                    localStorage.clear();
+                    window.location.href = 'login.html';
+                    return false;
+                }
+                return true;
+            } catch (error) {
+                console.error('Error verifying API key:', error);
+                return false;
+            }
+        }
+        
+        // Verify on page load
+        verifyApiKey().then(valid => {
+            if (valid) {
+                loadWebsites();
+                loadAccounts();
+            }
+        });
+        
         // Display username
         document.getElementById('username').textContent = username || 'User';
-        
-        // Load data on page load
-        loadWebsites();
-        loadAccounts();
         
         async function loadWebsites() {
             try {
@@ -204,7 +228,14 @@
                     headers: { 'X-API-Key': apiKey }
                 });
                 
-                if (!response.ok) throw new Error('Unauthorized');
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        localStorage.clear();
+                        window.location.href = 'login.html';
+                        return;
+                    }
+                    throw new Error('Failed to load websites');
+                }
                 
                 const data = await response.json();
                 const list = document.getElementById('websiteList');
@@ -222,8 +253,8 @@
                 
                 document.getElementById('websiteCount').textContent = data.websites.length;
             } catch (error) {
-                alert('Lỗi: ' + error.message);
-                logout();
+                console.error('Error loading websites:', error);
+                showNotification('⚠ Lỗi tải dữ liệu', 'danger');
             }
         }
         
@@ -233,7 +264,14 @@
                     headers: { 'X-API-Key': apiKey }
                 });
                 
-                if (!response.ok) throw new Error('Unauthorized');
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        localStorage.clear();
+                        window.location.href = 'login.html';
+                        return;
+                    }
+                    throw new Error('Failed to load accounts');
+                }
                 
                 const data = await response.json();
                 const list = document.getElementById('accountList');
@@ -251,7 +289,8 @@
                 
                 document.getElementById('accountCount').textContent = data.accounts.length;
             } catch (error) {
-                alert('Lỗi: ' + error.message);
+                console.error('Error loading accounts:', error);
+                showNotification('⚠ Lỗi tải dữ liệu', 'danger');
             }
         }
         
