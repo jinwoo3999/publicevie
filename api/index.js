@@ -353,7 +353,7 @@ app.get('/api/health', async (req, res) => {
     }
 });
 
-app.post('/api/debug/init-admin', async (req, res) => {
+app.post('/api/init-admin', async (req, res) => {
     try {
         const ADMIN_ID = 'admin';
         const adminPassword = bcrypt.hashSync(process.env.ADMIN_PASSWORD || 'Admin@2026!', 10);
