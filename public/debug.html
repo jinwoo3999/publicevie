@@ -130,10 +130,10 @@
         
         <!-- Initialize Admin -->
         <div class="section">
-            <h2>2. Initialize Admin User</h2>
-            <p style="color: #0a0; margin-bottom: 10px;">Chạy nếu admin user chưa tồn tại hoặc password không đúng</p>
-            <button onclick="initAdmin()">Initialize Admin</button>
-            <div id="initResult"></div>
+            <h2>2. Test Default Login</h2>
+            <p style="color: #0a0; margin-bottom: 10px;">Thử đăng nhập với tài khoản mặc định</p>
+            <p style="color: #0a0; margin-bottom: 10px;">Username: admin / Password: Admin@2026!</p>
+            <button onclick="document.getElementById('testUsername').value='admin'; document.getElementById('testPassword').value='Admin@2026!'; testLogin()">Quick Test Admin</button>
         </div>
         
         <!-- Test Login -->
@@ -173,50 +173,16 @@
                 const response = await fetch(`${API_URL}/health`);
                 const data = await response.json();
                 
-                let statusClass = data.kvConnected && data.dbInitialized ? 'success' : 'error';
-                let statusText = data.kvConnected ? '✅ KV Connected' : '❌ KV Not Connected';
+                let statusClass = data.status === 'OK' ? 'success' : 'error';
                 
                 resultDiv.innerHTML = `
-                    <div class="status ${statusClass}">${statusText}</div>
+                    <div class="status ${statusClass}">✅ Server OK - Storage: ${data.storage}</div>
                     <pre>${JSON.stringify(data, null, 2)}</pre>
                 `;
-                
-                if (!data.dbInitialized || !data.adminExists) {
-                    resultDiv.innerHTML += '<div class="status error">⚠️ Admin user chưa được khởi tạo! Chạy "Initialize Admin" ở bước 2</div>';
-                }
             } catch (error) {
                 resultDiv.innerHTML = `
                     <div class="status error">❌ Error: ${error.message}</div>
                     <pre>${error.stack}</pre>
-                `;
-            }
-        }
-        
-        async function initAdmin() {
-            const resultDiv = document.getElementById('initResult');
-            resultDiv.innerHTML = '<div class="status">Initializing...</div>';
-            
-            try {
-                const response = await fetch(`${API_URL}/init-admin`, {
-                    method: 'POST'
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    resultDiv.innerHTML = `
-                        <div class="status success">✅ Admin user initialized!</div>
-                        <pre>${JSON.stringify(data, null, 2)}</pre>
-                        <div class="status success">Bây giờ có thể đăng nhập với: admin / Admin@2026!</div>
-                    `;
-                } else {
-                    resultDiv.innerHTML = `
-                        <div class="status error">❌ Failed: ${data.error}</div>
-                    `;
-                }
-            } catch (error) {
-                resultDiv.innerHTML = `
-                    <div class="status error">❌ Error: ${error.message}</div>
                 `;
             }
         }

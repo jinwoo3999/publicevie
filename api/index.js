@@ -5,7 +5,6 @@ const rateLimit = require('express-rate-limit');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
-const { kv } = require('@vercel/kv');
 
 const app = express();
 
@@ -27,41 +26,45 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-async function initializeDatabase() {
-    const hasInit = await kv.get('db:initialized');
-    if (hasInit) return;
+// In-memory storage
+const users = new Map();
+const apiKeys = new Map();
+
+// Initialize default data
+function initializeDatabase() {
+    const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Admin@2026!';
+    const adminPassword = bcrypt.hashSync(ADMIN_PASSWORD, 10);
     
-    const ADMIN_ID = 'admin';
-    const adminPassword = bcrypt.hashSync(process.env.ADMIN_PASSWORD || 'admin123', 10);
-    
-    await kv.hset(`user:${ADMIN_ID}`, {
-        id: ADMIN_ID,
+    users.set('admin', {
+        id: 'admin',
         username: 'admin',
         password: adminPassword,
         role: 'admin',
+        websites: ['ok168.pro', 'ok168.com', 'ok168.net', 'ok168.vip'],
+        accounts: ['admin123', 'user001', 'vip888', 'test123'],
         createdAt: new Date().toISOString()
     });
     
-    await kv.sadd(`user:${ADMIN_ID}:websites`, 'ok168.pro', 'ok168.com', 'ok168.net', 'ok168.vip');
-    await kv.sadd(`user:${ADMIN_ID}:accounts`, 'admin123', 'user001', 'vip888', 'test123');
+    // Default users
+    users.set('1ec168', {
+        id: '1ec168',
+        username: '1ec168',
+        password: bcrypt.hashSync('123456', 10),
+        role: 'user',
+        websites: [],
+        accounts: [],
+        createdAt: new Date().toISOString()
+    });
     
-    const defaultUsers = [
-        { username: '1ec168', password: '123456', role: 'user' },
-        { username: 'user1', password: '123456', role: 'user' }
-    ];
-    
-    for (const userData of defaultUsers) {
-        const hashedPassword = bcrypt.hashSync(userData.password, 10);
-        await kv.hset(`user:${userData.username}`, {
-            id: userData.username,
-            username: userData.username,
-            password: hashedPassword,
-            role: userData.role,
-            createdAt: new Date().toISOString()
-        });
-    }
-    
-    await kv.set('db:initialized', 'true');
+    users.set('user1', {
+        id: 'user1',
+        username: 'user1',
+        password: bcrypt.hashSync('123456', 10),
+        role: 'user',
+        websites: [],
+        accounts: [],
+        createdAt: new Date().toISOString()
+    });
 }
 
 initializeDatabase();
@@ -70,26 +73,25 @@ function generateApiKey() {
     return crypto.randomBytes(32).toString('hex');
 }
 
-async function createApiKey(userId, expiresIn = 24 * 60 * 60 * 1000) {
+function createApiKey(userId, expiresIn = 24 * 60 * 60 * 1000) {
     const key = generateApiKey();
     const expiresAt = new Date(Date.now() + expiresIn);
     
-    await kv.hset(`apikey:${key}`, {
+    apiKeys.set(key, {
         userId,
         createdAt: new Date().toISOString(),
         expiresAt: expiresAt.toISOString()
     });
     
-    await kv.expire(`apikey:${key}`, 86400);
     return { key, expiresAt };
 }
 
-async function validateApiKey(key) {
-    const keyData = await kv.hgetall(`apikey:${key}`);
+function validateApiKey(key) {
+    const keyData = apiKeys.get(key);
     if (!keyData) return null;
     
     if (new Date() > new Date(keyData.expiresAt)) {
-        await kv.del(`apikey:${key}`);
+        apiKeys.delete(key);
         return null;
     }
     
@@ -107,15 +109,15 @@ const authenticateToken = (req, res, next) => {
     });
 };
 
-const authenticateApiKey = async (req, res, next) => {
+const authenticateApiKey = (req, res, next) => {
     const apiKey = req.headers['x-api-key'];
     if (!apiKey) return res.status(401).json({ error: 'API key required' });
     
-    const keyData = await validateApiKey(apiKey);
+    const keyData = validateApiKey(apiKey);
     if (!keyData) return res.status(401).json({ error: 'Invalid or expired API key' });
     
     req.userId = keyData.userId;
-    const user = await kv.hgetall(`user:${keyData.userId}`);
+    const user = users.get(keyData.userId);
     req.user = user;
     next();
 };
@@ -130,19 +132,20 @@ app.post('/api/auth/register', async (req, res) => {
         const { username, password } = req.body;
         if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
         
-        const existingUser = await kv.hgetall(`user:${username}`);
-        if (existingUser && existingUser.username) {
+        if (users.has(username)) {
             return res.status(400).json({ error: 'Username already exists' });
         }
         
         const userId = crypto.randomBytes(16).toString('hex');
         const hashedPassword = await bcrypt.hash(password, 10);
         
-        await kv.hset(`user:${userId}`, {
+        users.set(username, {
             id: userId,
             username,
             password: hashedPassword,
             role: 'user',
+            websites: [],
+            accounts: [],
             createdAt: new Date().toISOString()
         });
         
@@ -157,8 +160,8 @@ app.post('/api/auth/login', async (req, res) => {
     try {
         const { username, password } = req.body;
         
-        const user = await kv.hgetall(`user:${username}`);
-        if (!user || !user.username) return res.status(401).json({ error: 'Invalid credentials' });
+        const user = users.get(username);
+        if (!user) return res.status(401).json({ error: 'Invalid credentials' });
         
         const validPassword = await bcrypt.compare(password, user.password);
         if (!validPassword) return res.status(401).json({ error: 'Invalid credentials' });
@@ -170,48 +173,62 @@ app.post('/api/auth/login', async (req, res) => {
     }
 });
 
-app.post('/api/auth/generate-key', authenticateToken, async (req, res) => {
-    const { key, expiresAt } = await createApiKey(req.user.id);
+app.post('/api/auth/generate-key', authenticateToken, (req, res) => {
+    const { key, expiresAt } = createApiKey(req.user.id);
     res.json({ success: true, apiKey: key, expiresAt, message: 'API key will auto-expire in 24 hours' });
 });
 
-app.get('/api/websites', authenticateApiKey, async (req, res) => {
-    const websites = await kv.smembers(`user:${req.userId}:websites`) || [];
-    res.json({ success: true, websites });
+app.get('/api/websites', authenticateApiKey, (req, res) => {
+    const user = users.get(req.userId);
+    res.json({ success: true, websites: user.websites || [] });
 });
 
-app.post('/api/websites', authenticateApiKey, async (req, res) => {
+app.post('/api/websites', authenticateApiKey, (req, res) => {
     const { domain } = req.body;
     if (!domain) return res.status(400).json({ error: 'Domain required' });
     
+    const user = users.get(req.userId);
     const normalizedDomain = domain.toLowerCase().trim();
-    await kv.sadd(`user:${req.userId}:websites`, normalizedDomain);
+    
+    if (!user.websites.includes(normalizedDomain)) {
+        user.websites.push(normalizedDomain);
+    }
+    
     res.json({ success: true, message: 'Website added', domain: normalizedDomain });
 });
 
-app.delete('/api/websites/:domain', authenticateApiKey, async (req, res) => {
+app.delete('/api/websites/:domain', authenticateApiKey, (req, res) => {
     const domain = req.params.domain.toLowerCase();
-    await kv.srem(`user:${req.userId}:websites`, domain);
+    const user = users.get(req.userId);
+    
+    user.websites = user.websites.filter(w => w !== domain);
     res.json({ success: true, message: 'Website removed' });
 });
 
-app.get('/api/accounts', authenticateApiKey, async (req, res) => {
-    const accounts = await kv.smembers(`user:${req.userId}:accounts`) || [];
-    res.json({ success: true, accounts });
+app.get('/api/accounts', authenticateApiKey, (req, res) => {
+    const user = users.get(req.userId);
+    res.json({ success: true, accounts: user.accounts || [] });
 });
 
-app.post('/api/accounts', authenticateApiKey, async (req, res) => {
+app.post('/api/accounts', authenticateApiKey, (req, res) => {
     const { account } = req.body;
     if (!account) return res.status(400).json({ error: 'Account required' });
     
+    const user = users.get(req.userId);
     const normalizedAccount = account.toLowerCase().trim();
-    await kv.sadd(`user:${req.userId}:accounts`, normalizedAccount);
+    
+    if (!user.accounts.includes(normalizedAccount)) {
+        user.accounts.push(normalizedAccount);
+    }
+    
     res.json({ success: true, message: 'Account added', account: normalizedAccount });
 });
 
-app.delete('/api/accounts/:account', authenticateApiKey, async (req, res) => {
+app.delete('/api/accounts/:account', authenticateApiKey, (req, res) => {
     const account = req.params.account.toLowerCase();
-    await kv.srem(`user:${req.userId}:accounts`, account);
+    const user = users.get(req.userId);
+    
+    user.accounts = user.accounts.filter(a => a !== account);
     res.json({ success: true, message: 'Account removed' });
 });
 
@@ -221,8 +238,8 @@ app.post('/api/check-website', authenticateApiKey, async (req, res) => {
         if (!url) return res.status(400).json({ error: 'URL required' });
         
         const domain = url.toLowerCase().trim().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '').split('?')[0].split('#')[0];
-        const myWebsites = await kv.smembers(`user:${req.userId}:websites`) || [];
-        const isAllowed = myWebsites.some(allowed => domain === allowed || domain.endsWith('.' + allowed));
+        const user = users.get(req.userId);
+        const isAllowed = user.websites.some(allowed => domain === allowed || domain.endsWith('.' + allowed));
         
         await new Promise(resolve => setTimeout(resolve, 1000));
         res.json({ success: true, domain, isAllowed, timestamp: new Date().toISOString() });
@@ -237,8 +254,8 @@ app.post('/api/check-account', authenticateApiKey, async (req, res) => {
         if (!account) return res.status(400).json({ error: 'Account required' });
         
         const normalizedAccount = account.toLowerCase().trim();
-        const myAccounts = await kv.smembers(`user:${req.userId}:accounts`) || [];
-        const isAllowed = myAccounts.includes(normalizedAccount);
+        const user = users.get(req.userId);
+        const isAllowed = user.accounts.includes(normalizedAccount);
         
         await new Promise(resolve => setTimeout(resolve, 1000));
         res.json({ success: true, account: normalizedAccount, isAllowed, timestamp: new Date().toISOString() });
@@ -263,29 +280,16 @@ app.post('/api/clean', authenticateApiKey, async (req, res) => {
     }
 });
 
-app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) => {
+app.get('/api/admin/users', authenticateToken, requireAdmin, (req, res) => {
     try {
-        const keys = await kv.keys('user:*');
-        const userList = [];
-        
-        for (const key of keys) {
-            if (key.includes(':websites') || key.includes(':accounts')) continue;
-            
-            const user = await kv.hgetall(key);
-            if (user && user.username) {
-                const websiteCount = await kv.scard(`user:${user.id}:websites`) || 0;
-                const accountCount = await kv.scard(`user:${user.id}:accounts`) || 0;
-                
-                userList.push({
-                    id: user.id,
-                    username: user.username,
-                    role: user.role,
-                    createdAt: user.createdAt,
-                    websiteCount,
-                    accountCount
-                });
-            }
-        }
+        const userList = Array.from(users.values()).map(user => ({
+            id: user.id,
+            username: user.username,
+            role: user.role,
+            createdAt: user.createdAt,
+            websiteCount: user.websites.length,
+            accountCount: user.accounts.length
+        }));
         
         res.json({ success: true, users: userList });
     } catch (error) {
@@ -293,99 +297,74 @@ app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) =>
     }
 });
 
+app.post('/api/admin/create-user', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
+        
+        if (users.has(username)) {
+            return res.status(400).json({ error: 'Username already exists' });
+        }
+        
+        const userId = crypto.randomBytes(16).toString('hex');
+        const hashedPassword = await bcrypt.hash(password, 10);
+        
+        users.set(username, {
+            id: userId,
+            username,
+            password: hashedPassword,
+            role: 'user',
+            websites: [],
+            accounts: [],
+            createdAt: new Date().toISOString()
+        });
+        
+        res.json({ success: true, message: 'User created', user: { id: userId, username, role: 'user' } });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to create user' });
+    }
+});
+
 app.post('/api/admin/reset-password', authenticateToken, requireAdmin, async (req, res) => {
     const { userId, newPassword } = req.body;
     if (!userId || !newPassword) return res.status(400).json({ error: 'User ID and new password required' });
     
-    const user = await kv.hgetall(`user:${userId}`);
-    if (!user || !user.username) return res.status(404).json({ error: 'User not found' });
+    const user = Array.from(users.values()).find(u => u.id === userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
     
     const hashedPassword = await bcrypt.hash(newPassword, 10);
-    await kv.hset(`user:${userId}`, 'password', hashedPassword);
+    user.password = hashedPassword;
+    
     res.json({ success: true, message: 'Password reset successfully' });
 });
 
-app.delete('/api/admin/users/:userId', authenticateToken, requireAdmin, async (req, res) => {
+app.delete('/api/admin/users/:userId', authenticateToken, requireAdmin, (req, res) => {
     const { userId } = req.params;
     if (userId === 'admin') return res.status(400).json({ error: 'Cannot delete admin user' });
     
-    await kv.del(`user:${userId}`);
-    await kv.del(`user:${userId}:websites`);
-    await kv.del(`user:${userId}:accounts`);
+    const user = Array.from(users.entries()).find(([, u]) => u.id === userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
     
-    const apiKeys = await kv.keys(`apikey:*`);
-    for (const key of apiKeys) {
-        const keyData = await kv.hgetall(key);
-        if (keyData && keyData.userId === userId) {
-            await kv.del(key);
+    users.delete(user[0]);
+    
+    // Remove associated API keys
+    for (const [key, data] of apiKeys.entries()) {
+        if (data.userId === userId) {
+            apiKeys.delete(key);
         }
     }
     
     res.json({ success: true, message: 'User deleted' });
 });
 
-app.get('/api/health', async (req, res) => {
-    try {
-        const hasInit = await kv.get('db:initialized');
-        const adminUser = await kv.hgetall('user:admin');
-        const userKeys = await kv.keys('user:*');
-        
-        res.json({ 
-            status: 'OK', 
-            timestamp: new Date().toISOString(),
-            kvConnected: true,
-            dbInitialized: !!hasInit,
-            adminExists: !!adminUser,
-            totalUserKeys: userKeys.length,
-            adminData: adminUser ? {
-                username: adminUser.username,
-                role: adminUser.role,
-                hasPassword: !!adminUser.password
-            } : null
-        });
-    } catch (error) {
-        res.json({ 
-            status: 'ERROR', 
-            timestamp: new Date().toISOString(),
-            kvConnected: false,
-            error: error.message
-        });
-    }
-});
-
-app.post('/api/init-admin', async (req, res) => {
-    try {
-        const ADMIN_ID = 'admin';
-        const adminPassword = bcrypt.hashSync(process.env.ADMIN_PASSWORD || 'Admin@2026!', 10);
-        
-        await kv.hset(`user:${ADMIN_ID}`, {
-            id: ADMIN_ID,
-            username: 'admin',
-            password: adminPassword,
-            role: 'admin',
-            createdAt: new Date().toISOString()
-        });
-        
-        await kv.sadd(`user:${ADMIN_ID}:websites`, 'ok168.pro', 'ok168.com', 'ok168.net', 'ok168.vip');
-        await kv.sadd(`user:${ADMIN_ID}:accounts`, 'admin123', 'user001', 'vip888', 'test123');
-        
-        const adminUser = await kv.hgetall(`user:${ADMIN_ID}`);
-        
-        res.json({ 
-            success: true, 
-            message: 'Admin user initialized',
-            admin: {
-                username: adminUser.username,
-                role: adminUser.role,
-                hasPassword: !!adminUser.password
-            }
-        });
-    } catch (error) {
-        res.status(500).json({ 
-            success: false, 
-            error: error.message 
-        });
-    }
+app.get('/api/health', (req, res) => {
+    res.json({ 
+        status: 'OK', 
+        timestamp: new Date().toISOString(),
+        storage: 'in-memory',
+        users: users.size,
+        apiKeys: apiKeys.size
+    });
 });
 
 module.exports = app;
