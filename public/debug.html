@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EVIE Debug</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1a1a1a;
+            color: #0f0;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: #000;
+            border: 2px solid #0f0;
+            border-radius: 10px;
+            padding: 30px;
+        }
+        
+        h1 {
+            color: #0f0;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .section {
+            background: rgba(0, 50, 0, 0.3);
+            border: 1px solid #0a0;
+            border-radius: 5px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .section h2 {
+            color: #0f0;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        button {
+            background: #0a0;
+            color: #000;
+            border: 2px solid #0f0;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            margin: 5px;
+        }
+        
+        button:hover {
+            background: #0f0;
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        pre {
+            background: #000;
+            border: 1px solid #0a0;
+            border-radius: 5px;
+            padding: 15px;
+            overflow-x: auto;
+            margin-top: 10px;
+            color: #0f0;
+            font-size: 12px;
+        }
+        
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        
+        .status.success {
+            background: rgba(0, 255, 0, 0.2);
+            border: 1px solid #0f0;
+            color: #0f0;
+        }
+        
+        .status.error {
+            background: rgba(255, 0, 0, 0.2);
+            border: 1px solid #f00;
+            color: #f00;
+        }
+        
+        input {
+            background: #000;
+            border: 2px solid #0a0;
+            color: #0f0;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            width: 200px;
+            margin: 5px;
+        }
+        
+        .test-login {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 EVIE DEBUG PANEL</h1>
+        
+        <!-- Health Check -->
+        <div class="section">
+            <h2>1. Health Check & KV Status</h2>
+            <button onclick="checkHealth()">Check Health</button>
+            <div id="healthResult"></div>
+        </div>
+        
+        <!-- Initialize Admin -->
+        <div class="section">
+            <h2>2. Initialize Admin User</h2>
+            <p style="color: #0a0; margin-bottom: 10px;">Chạy nếu admin user chưa tồn tại hoặc password không đúng</p>
+            <button onclick="initAdmin()">Initialize Admin</button>
+            <div id="initResult"></div>
+        </div>
+        
+        <!-- Test Login -->
+        <div class="section">
+            <h2>3. Test Login</h2>
+            <div class="test-login">
+                <input type="text" id="testUsername" placeholder="admin" value="admin">
+                <input type="password" id="testPassword" placeholder="Admin@2026!" value="Admin@2026!">
+                <button onclick="testLogin()">Test Login</button>
+            </div>
+            <div id="loginResult"></div>
+        </div>
+        
+        <!-- Check All Users -->
+        <div class="section">
+            <h2>4. List All Users (Need Admin Login)</h2>
+            <button onclick="listUsers()">List Users</button>
+            <div id="usersResult"></div>
+        </div>
+        
+        <!-- Links -->
+        <div class="section">
+            <h2>🔗 Quick Links</h2>
+            <button onclick="window.location.href='login.html'">Go to Login</button>
+            <button onclick="window.location.href='index.html'">Go to Home</button>
+        </div>
+    </div>
+    
+    <script>
+        const API_URL = 'https://evie-system.vercel.app/api';
+        
+        async function checkHealth() {
+            const resultDiv = document.getElementById('healthResult');
+            resultDiv.innerHTML = '<div class="status">Checking...</div>';
+            
+            try {
+                const response = await fetch(`${API_URL}/health`);
+                const data = await response.json();
+                
+                let statusClass = data.kvConnected && data.dbInitialized ? 'success' : 'error';
+                let statusText = data.kvConnected ? '✅ KV Connected' : '❌ KV Not Connected';
+                
+                resultDiv.innerHTML = `
+                    <div class="status ${statusClass}">${statusText}</div>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+                
+                if (!data.dbInitialized || !data.adminExists) {
+                    resultDiv.innerHTML += '<div class="status error">⚠️ Admin user chưa được khởi tạo! Chạy "Initialize Admin" ở bước 2</div>';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="status error">❌ Error: ${error.message}</div>
+                    <pre>${error.stack}</pre>
+                `;
+            }
+        }
+        
+        async function initAdmin() {
+            const resultDiv = document.getElementById('initResult');
+            resultDiv.innerHTML = '<div class="status">Initializing...</div>';
+            
+            try {
+                const response = await fetch(`${API_URL}/debug/init-admin`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.innerHTML = `
+                        <div class="status success">✅ Admin user initialized!</div>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                        <div class="status success">Bây giờ có thể đăng nhập với: admin / Admin@2026!</div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="status error">❌ Failed: ${data.error}</div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="status error">❌ Error: ${error.message}</div>
+                `;
+            }
+        }
+        
+        async function testLogin() {
+            const resultDiv = document.getElementById('loginResult');
+            const username = document.getElementById('testUsername').value;
+            const password = document.getElementById('testPassword').value;
+            
+            resultDiv.innerHTML = '<div class="status">Testing login...</div>';
+            
+            try {
+                console.log('Attempting login with:', username);
+                
+                const response = await fetch(`${API_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                console.log('Response status:', response.status);
+                
+                const data = await response.json();
+                console.log('Response data:', data);
+                
+                if (data.success) {
+                    resultDiv.innerHTML = `
+                        <div class="status success">✅ Login successful!</div>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                    
+                    // Save token for other tests
+                    localStorage.setItem('debugToken', data.token);
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="status error">❌ Login failed: ${data.error}</div>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="status error">❌ Error: ${error.message}</div>
+                    <pre>${error.stack}</pre>
+                `;
+            }
+        }
+        
+        async function listUsers() {
+            const resultDiv = document.getElementById('usersResult');
+            const token = localStorage.getItem('debugToken');
+            
+            if (!token) {
+                resultDiv.innerHTML = '<div class="status error">❌ Cần login trước (chạy Test Login)</div>';
+                return;
+            }
+            
+            resultDiv.innerHTML = '<div class="status">Loading users...</div>';
+            
+            try {
+                const response = await fetch(`${API_URL}/admin/users`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.innerHTML = `
+                        <div class="status success">✅ Found ${data.users.length} users</div>
+                        <pre>${JSON.stringify(data.users, null, 2)}</pre>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="status error">❌ Failed: ${data.error}</div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="status error">❌ Error: ${error.message}</div>
+                `;
+            }
+        }
+        
+        // Auto-check health on load
+        window.addEventListener('load', checkHealth);
+    </script>
+</body>
+</html>

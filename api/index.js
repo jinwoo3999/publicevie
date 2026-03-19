@@ -324,8 +324,68 @@ app.delete('/api/admin/users/:userId', authenticateToken, requireAdmin, async (r
     res.json({ success: true, message: 'User deleted' });
 });
 
-app.get('/api/health', (req, res) => {
-    res.json({ status: 'OK', timestamp: new Date().toISOString() });
+app.get('/api/health', async (req, res) => {
+    try {
+        const hasInit = await kv.get('db:initialized');
+        const adminUser = await kv.hgetall('user:admin');
+        const userKeys = await kv.keys('user:*');
+        
+        res.json({ 
+            status: 'OK', 
+            timestamp: new Date().toISOString(),
+            kvConnected: true,
+            dbInitialized: !!hasInit,
+            adminExists: !!adminUser,
+            totalUserKeys: userKeys.length,
+            adminData: adminUser ? {
+                username: adminUser.username,
+                role: adminUser.role,
+                hasPassword: !!adminUser.password
+            } : null
+        });
+    } catch (error) {
+        res.json({ 
+            status: 'ERROR', 
+            timestamp: new Date().toISOString(),
+            kvConnected: false,
+            error: error.message
+        });
+    }
+});
+
+app.post('/api/debug/init-admin', async (req, res) => {
+    try {
+        const ADMIN_ID = 'admin';
+        const adminPassword = bcrypt.hashSync(process.env.ADMIN_PASSWORD || 'Admin@2026!', 10);
+        
+        await kv.hset(`user:${ADMIN_ID}`, {
+            id: ADMIN_ID,
+            username: 'admin',
+            password: adminPassword,
+            role: 'admin',
+            createdAt: new Date().toISOString()
+        });
+        
+        await kv.sadd(`user:${ADMIN_ID}:websites`, 'ok168.pro', 'ok168.com', 'ok168.net', 'ok168.vip');
+        await kv.sadd(`user:${ADMIN_ID}:accounts`, 'admin123', 'user001', 'vip888', 'test123');
+        
+        const adminUser = await kv.hgetall(`user:${ADMIN_ID}`);
+        
+        res.json({ 
+            success: true, 
+            message: 'Admin user initialized',
+            admin: {
+                username: adminUser.username,
+                role: adminUser.role,
+                hasPassword: !!adminUser.password
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ 
+            success: false, 
+            error: error.message 
+        });
+    }
 });
 
 module.exports = app;
