@@ -36,7 +36,8 @@ function loadDatabase() {
             return {
                 users: new Map(data.users || []),
                 userWebsites: new Map(data.userWebsites?.map(([k, v]) => [k, new Set(v)]) || []),
-                userAccounts: new Map(data.userAccounts?.map(([k, v]) => [k, new Set(v)]) || [])
+                userAccounts: new Map(data.userAccounts?.map(([k, v]) => [k, new Set(v)]) || []),
+                apiKeys: new Map(data.apiKeys?.map(([k, v]) => [k, { ...v, createdAt: new Date(v.createdAt), expiresAt: new Date(v.expiresAt) }]) || [])
             };
         }
     } catch (error) {
@@ -46,6 +47,7 @@ function loadDatabase() {
     const users = new Map();
     const userWebsites = new Map();
     const userAccounts = new Map();
+    const apiKeys = new Map();
     
     const ADMIN_ID = 'admin';
     const adminPassword = bcrypt.hashSync(process.env.ADMIN_PASSWORD || 'admin123', 10);
@@ -78,16 +80,17 @@ function loadDatabase() {
     userWebsites.set(ADMIN_ID, new Set(['ok168.pro', 'ok168.com', 'ok168.net', 'ok168.vip']));
     userAccounts.set(ADMIN_ID, new Set(['admin123', 'user001', 'vip888', 'test123']));
     
-    saveDatabase(users, userWebsites, userAccounts);
-    return { users, userWebsites, userAccounts };
+    saveDatabase(users, userWebsites, userAccounts, apiKeys);
+    return { users, userWebsites, userAccounts, apiKeys };
 }
 
-function saveDatabase(users, userWebsites, userAccounts) {
+function saveDatabase(users, userWebsites, userAccounts, apiKeys) {
     try {
         const data = {
             users: Array.from(users.entries()),
             userWebsites: Array.from(userWebsites.entries()).map(([k, v]) => [k, Array.from(v)]),
-            userAccounts: Array.from(userAccounts.entries()).map(([k, v]) => [k, Array.from(v)])
+            userAccounts: Array.from(userAccounts.entries()).map(([k, v]) => [k, Array.from(v)]),
+            apiKeys: Array.from(apiKeys.entries()).map(([k, v]) => [k, { ...v, createdAt: v.createdAt.toISOString(), expiresAt: v.expiresAt.toISOString() }])
         };
         fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
     } catch (error) {
@@ -95,8 +98,7 @@ function saveDatabase(users, userWebsites, userAccounts) {
     }
 }
 
-const { users, userWebsites, userAccounts } = loadDatabase();
-const apiKeys = new Map();
+const { users, userWebsites, userAccounts, apiKeys } = loadDatabase();
 
 function generateApiKey() {
     return crypto.randomBytes(32).toString('hex');
@@ -106,6 +108,7 @@ function createApiKey(userId, expiresIn = 24 * 60 * 60 * 1000) {
     const key = generateApiKey();
     const expiresAt = new Date(Date.now() + expiresIn);
     apiKeys.set(key, { userId, createdAt: new Date(), expiresAt });
+    saveDatabase(users, userWebsites, userAccounts, apiKeys);
     return { key, expiresAt };
 }
 
@@ -114,6 +117,7 @@ function validateApiKey(key) {
     if (!keyData) return null;
     if (new Date() > keyData.expiresAt) {
         apiKeys.delete(key);
+        saveDatabase(users, userWebsites, userAccounts, apiKeys);
         return null;
     }
     return keyData;
@@ -167,7 +171,7 @@ app.post('/api/auth/register', async (req, res) => {
         
         userWebsites.set(userId, new Set());
         userAccounts.set(userId, new Set());
-        saveDatabase(users, userWebsites, userAccounts);
+        saveDatabase(users, userWebsites, userAccounts, apiKeys);
         
         const token = jwt.sign({ id: userId, username, role: 'user' }, process.env.JWT_SECRET || 'your-secret-key', { expiresIn: '7d' });
         res.json({ success: true, token, user: { id: userId, username, role: 'user' } });
@@ -215,7 +219,7 @@ app.post('/api/websites', authenticateApiKey, (req, res) => {
     const normalizedDomain = domain.toLowerCase().trim();
     if (!userWebsites.has(req.userId)) userWebsites.set(req.userId, new Set());
     userWebsites.get(req.userId).add(normalizedDomain);
-    saveDatabase(users, userWebsites, userAccounts);
+    saveDatabase(users, userWebsites, userAccounts, apiKeys);
     res.json({ success: true, message: 'Website added', domain: normalizedDomain });
 });
 
@@ -223,7 +227,7 @@ app.delete('/api/websites/:domain', authenticateApiKey, (req, res) => {
     const domain = req.params.domain.toLowerCase();
     if (userWebsites.has(req.userId)) {
         userWebsites.get(req.userId).delete(domain);
-        saveDatabase(users, userWebsites, userAccounts);
+        saveDatabase(users, userWebsites, userAccounts, apiKeys);
     }
     res.json({ success: true, message: 'Website removed' });
 });
@@ -240,7 +244,7 @@ app.post('/api/accounts', authenticateApiKey, (req, res) => {
     const normalizedAccount = account.toLowerCase().trim();
     if (!userAccounts.has(req.userId)) userAccounts.set(req.userId, new Set());
     userAccounts.get(req.userId).add(normalizedAccount);
-    saveDatabase(users, userWebsites, userAccounts);
+    saveDatabase(users, userWebsites, userAccounts, apiKeys);
     res.json({ success: true, message: 'Account added', account: normalizedAccount });
 });
 
@@ -248,7 +252,7 @@ app.delete('/api/accounts/:account', authenticateApiKey, (req, res) => {
     const account = req.params.account.toLowerCase();
     if (userAccounts.has(req.userId)) {
         userAccounts.get(req.userId).delete(account);
-        saveDatabase(users, userWebsites, userAccounts);
+        saveDatabase(users, userWebsites, userAccounts, apiKeys);
     }
     res.json({ success: true, message: 'Account removed' });
 });
@@ -323,7 +327,7 @@ app.post('/api/admin/reset-password', authenticateToken, requireAdmin, async (re
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     user.password = hashedPassword;
     users.set(userId, user);
-    saveDatabase(users, userWebsites, userAccounts);
+    saveDatabase(users, userWebsites, userAccounts, apiKeys);
     res.json({ success: true, message: 'Password reset successfully' });
 });
 
@@ -339,7 +343,7 @@ app.delete('/api/admin/users/:userId', authenticateToken, requireAdmin, (req, re
         if (data.userId === userId) apiKeys.delete(key);
     }
     
-    saveDatabase(users, userWebsites, userAccounts);
+    saveDatabase(users, userWebsites, userAccounts, apiKeys);
     res.json({ success: true, message: 'User deleted' });
 });
 
