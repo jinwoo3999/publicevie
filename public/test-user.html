@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test User Creation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .section {
+            background: #2a2a2a;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+            border: 2px solid #0f0;
+        }
+        h2 {
+            color: #0f0;
+        }
+        button {
+            background: #0f0;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            border-radius: 5px;
+        }
+        button:hover {
+            background: #0a0;
+        }
+        input {
+            padding: 10px;
+            margin: 5px;
+            background: #000;
+            border: 2px solid #0f0;
+            color: #0f0;
+            border-radius: 5px;
+        }
+        pre {
+            background: #000;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            color: #0f0;
+        }
+        .success { color: #0f0; }
+        .error { color: #f00; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test User Creation & Login</h1>
+    
+    <!-- Step 1: Login as Admin -->
+    <div class="section">
+        <h2>Bước 1: Đăng nhập Admin</h2>
+        <input type="text" id="adminUser" value="admin" placeholder="admin">
+        <input type="password" id="adminPass" value="Admin@2026!" placeholder="Admin@2026!">
+        <button onclick="loginAdmin()">Login Admin</button>
+        <pre id="step1Result"></pre>
+    </div>
+    
+    <!-- Step 2: Create New User -->
+    <div class="section">
+        <h2>Bước 2: Tạo User Mới</h2>
+        <input type="text" id="newUsername" value="testuser123" placeholder="testuser123">
+        <input type="password" id="newPassword" value="password123" placeholder="password123">
+        <button onclick="createUser()">Create User</button>
+        <pre id="step2Result"></pre>
+    </div>
+    
+    <!-- Step 3: Logout -->
+    <div class="section">
+        <h2>Bước 3: Đăng Xuất</h2>
+        <button onclick="logout()">Logout (Clear LocalStorage)</button>
+        <pre id="step3Result"></pre>
+    </div>
+    
+    <!-- Step 4: Login as New User -->
+    <div class="section">
+        <h2>Bước 4: Đăng Nhập User Mới</h2>
+        <button onclick="loginNewUser()">Login as New User</button>
+        <pre id="step4Result"></pre>
+    </div>
+    
+    <!-- Step 5: Check if User Persists -->
+    <div class="section">
+        <h2>Bước 5: Kiểm Tra User Có Tồn Tại</h2>
+        <button onclick="checkUserExists()">Check User in Database</button>
+        <pre id="step5Result"></pre>
+    </div>
+    
+    <script src="api-config.js"></script>
+    <script>
+        let adminToken = null;
+        let newUserCredentials = null;
+        
+        async function loginAdmin() {
+            const result = document.getElementById('step1Result');
+            result.innerHTML = 'Đang đăng nhập admin...';
+            
+            try {
+                const username = document.getElementById('adminUser').value;
+                const password = document.getElementById('adminPass').value;
+                
+                const response = await fetch(`${API_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    adminToken = data.token;
+                    localStorage.setItem('adminToken', data.token);
+                    result.innerHTML = `<span class="success">✅ Admin login thành công!</span>\n${JSON.stringify(data, null, 2)}`;
+                } else {
+                    result.innerHTML = `<span class="error">❌ Login thất bại: ${data.error}</span>`;
+                }
+            } catch (error) {
+                result.innerHTML = `<span class="error">❌ Error: ${error.message}</span>`;
+            }
+        }
+        
+        async function createUser() {
+            const result = document.getElementById('step2Result');
+            result.innerHTML = 'Đang tạo user...';
+            
+            if (!adminToken) {
+                result.innerHTML = '<span class="error">❌ Cần login admin trước!</span>';
+                return;
+            }
+            
+            try {
+                const username = document.getElementById('newUsername').value;
+                const password = document.getElementById('newPassword').value;
+                
+                newUserCredentials = { username, password };
+                
+                const response = await fetch(`${API_URL}/admin/create-user`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${adminToken}`
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    result.innerHTML = `<span class="success">✅ User tạo thành công!</span>\n${JSON.stringify(data, null, 2)}`;
+                } else {
+                    result.innerHTML = `<span class="error">❌ Tạo user thất bại: ${data.error}</span>`;
+                }
+            } catch (error) {
+                result.innerHTML = `<span class="error">❌ Error: ${error.message}</span>`;
+            }
+        }
+        
+        function logout() {
+            const result = document.getElementById('step3Result');
+            localStorage.clear();
+            adminToken = null;
+            result.innerHTML = '<span class="success">✅ Đã xóa localStorage và logout</span>';
+        }
+        
+        async function loginNewUser() {
+            const result = document.getElementById('step4Result');
+            result.innerHTML = 'Đang đăng nhập user mới...';
+            
+            if (!newUserCredentials) {
+                result.innerHTML = '<span class="error">❌ Cần tạo user trước!</span>';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newUserCredentials)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    result.innerHTML = `<span class="success">✅ User mới login thành công! User đã được lưu!</span>\n${JSON.stringify(data, null, 2)}`;
+                } else {
+                    result.innerHTML = `<span class="error">❌ Login thất bại: ${data.error}\n\nNghĩa là user KHÔNG được lưu vào database!</span>`;
+                }
+            } catch (error) {
+                result.innerHTML = `<span class="error">❌ Error: ${error.message}</span>`;
+            }
+        }
+        
+        async function checkUserExists() {
+            const result = document.getElementById('step5Result');
+            result.innerHTML = 'Đang kiểm tra...';
+            
+            if (!adminToken) {
+                result.innerHTML = '<span class="error">❌ Cần login admin trước!</span>';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/admin/users`, {
+                    headers: {
+                        'Authorization': `Bearer ${adminToken}`
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    const userExists = data.users.find(u => u.username === newUserCredentials?.username);
+                    
+                    if (userExists) {
+                        result.innerHTML = `<span class="success">✅ User tồn tại trong database!</span>\n${JSON.stringify(userExists, null, 2)}\n\nTất cả users:\n${JSON.stringify(data.users, null, 2)}`;
+                    } else {
+                        result.innerHTML = `<span class="error">❌ User KHÔNG tồn tại trong database!\n\nTất cả users:\n${JSON.stringify(data.users, null, 2)}</span>`;
+                    }
+                } else {
+                    result.innerHTML = `<span class="error">❌ Lỗi: ${data.error}</span>`;
+                }
+            } catch (error) {
+                result.innerHTML = `<span class="error">❌ Error: ${error.message}</span>`;
+            }
+        }
+    </script>
+</body>
+</html>
