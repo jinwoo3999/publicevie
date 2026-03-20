@@ -474,4 +474,46 @@ app.get('/api/health', (req, res) => {
     });
 });
 
+// Public endpoint to check website (no auth required)
+app.post('/api/public/check-website', async (req, res) => {
+    try {
+        const { url } = req.body;
+        if (!url) return res.status(400).json({ error: 'URL required' });
+        
+        const domain = url.toLowerCase().trim().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '').split('?')[0].split('#')[0];
+        
+        // Get all websites from all users
+        const result = await pool.query('SELECT DISTINCT domain FROM websites');
+        const allWebsites = result.rows.map(row => row.domain);
+        const isAllowed = allWebsites.some(allowed => domain === allowed || domain.endsWith('.' + allowed));
+        
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        res.json({ success: true, domain, isAllowed, timestamp: new Date().toISOString() });
+    } catch (error) {
+        console.error('Public check website error:', error);
+        res.status(500).json({ error: 'Check failed' });
+    }
+});
+
+// Public endpoint to check account (no auth required)
+app.post('/api/public/check-account', async (req, res) => {
+    try {
+        const { account } = req.body;
+        if (!account) return res.status(400).json({ error: 'Account required' });
+        
+        const normalizedAccount = account.toLowerCase().trim();
+        
+        // Get all accounts from all users
+        const result = await pool.query('SELECT DISTINCT account FROM accounts');
+        const allAccounts = result.rows.map(row => row.account);
+        const isAllowed = allAccounts.includes(normalizedAccount);
+        
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        res.json({ success: true, account: normalizedAccount, isAllowed, timestamp: new Date().toISOString() });
+    } catch (error) {
+        console.error('Public check account error:', error);
+        res.status(500).json({ error: 'Check failed' });
+    }
+});
+
 module.exports = app;

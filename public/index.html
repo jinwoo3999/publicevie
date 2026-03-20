@@ -436,6 +436,7 @@
         </div>
     </div>
     
+    <script src="api-config.js"></script>
     <script src="brand-config.js"></script>
     <script>
         const canvas = document.getElementById('matrix-bg');
@@ -523,7 +524,25 @@
                 await sleep(800);
             }
             
-            const isAllowed = checkAllowed(input);
+            // Call API to check
+            let isAllowed = false;
+            try {
+                const endpoint = currentTab === 'website' ? '/public/check-website' : '/public/check-account';
+                const body = currentTab === 'website' ? { url: input } : { account: input };
+                
+                const response = await fetch(`${API_URL}${endpoint}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                
+                const data = await response.json();
+                isAllowed = data.isAllowed;
+            } catch (error) {
+                console.error('API check error:', error);
+                // Fallback to config.js if API fails
+                isAllowed = checkAllowed(input);
+            }
             
             progressBar.classList.remove('show');
             statusText.classList.remove('show');
@@ -568,6 +587,7 @@
                     </div>
                 `, false);
             }
+        }
         }
         
         function checkAllowed(value) {
