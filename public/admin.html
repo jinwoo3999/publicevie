@@ -200,14 +200,23 @@
                 });
                 
                 if (!response.ok) {
-                    console.log('API key invalid, redirecting to login');
-                    localStorage.clear();
-                    window.location.href = 'login.html';
+                    console.log('API key invalid or expired, status:', response.status);
+                    const errorData = await response.json();
+                    console.log('Error:', errorData);
+                    
+                    // Only redirect if it's actually an auth error
+                    if (response.status === 401) {
+                        alert('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+                        localStorage.clear();
+                        window.location.href = 'login.html';
+                    }
                     return false;
                 }
                 return true;
             } catch (error) {
                 console.error('Error verifying API key:', error);
+                // Don't redirect on network errors, just show error
+                showNotification('⚠ Lỗi kết nối server', 'danger');
                 return false;
             }
         }

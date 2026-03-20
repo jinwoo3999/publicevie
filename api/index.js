@@ -358,13 +358,30 @@ const authenticateToken = (req, res, next) => {
 
 const authenticateApiKey = async (req, res, next) => {
     const apiKey = req.headers['x-api-key'];
-    if (!apiKey) return res.status(401).json({ error: 'API key required' });
+    if (!apiKey) {
+        console.log('❌ No API key provided');
+        return res.status(401).json({ error: 'API key required' });
+    }
+    
+    console.log('🔑 Validating API key:', apiKey.substring(0, 10) + '...');
     
     const keyData = await validateApiKey(apiKey);
-    if (!keyData) return res.status(401).json({ error: 'Invalid or expired API key' });
+    if (!keyData) {
+        console.log('❌ Invalid or expired API key');
+        return res.status(401).json({ error: 'Invalid or expired API key' });
+    }
+    
+    console.log('✅ API key valid for user:', keyData.userId);
     
     req.userId = keyData.userId;
     const user = await db.getUser(keyData.userId);
+    
+    if (!user || !user.username) {
+        console.log('❌ User not found for userId:', keyData.userId);
+        return res.status(401).json({ error: 'User not found' });
+    }
+    
+    console.log('✅ User found:', user.username);
     req.user = user;
     next();
 };
@@ -422,12 +439,16 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 app.post('/api/auth/generate-key', authenticateToken, async (req, res) => {
-    const { key, expiresAt } = await createApiKey(req.user.id);
+    console.log('🔑 Generating API key for user:', req.user);
+    const { key, expiresAt } = await createApiKey(req.user.username); // Use username instead of id
+    console.log('✅ API key generated:', key.substring(0, 10) + '...');
     res.json({ success: true, apiKey: key, expiresAt, message: 'API key will auto-expire in 24 hours' });
 });
 
 app.get('/api/websites', authenticateApiKey, async (req, res) => {
+    console.log('📋 Getting websites for user:', req.userId);
     const websites = await db.getWebsites(req.userId);
+    console.log('✅ Found websites:', websites.length);
     res.json({ success: true, websites });
 });
 
