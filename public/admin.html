@@ -131,6 +131,7 @@
     </style>
 </head>
 <body>
+    <script src="api-config.js"></script>
     <div class="background-animation"></div>
     
     <button class="logout-btn" onclick="logout()">Đăng Xuất</button>
@@ -182,7 +183,7 @@
     </div>
     
     <script>
-        const API_URL = 'https://evie-system.vercel.app/api';
+        // API_URL is defined in api-config.js
         let apiKey = localStorage.getItem('adminApiKey');
         const username = localStorage.getItem('adminUsername');
         
