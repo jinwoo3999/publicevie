@@ -527,16 +527,23 @@
             // Call API to check
             let isAllowed = false;
             try {
+                // Use API_URL from api-config.js, fallback to auto-detect
+                const apiUrl = typeof API_URL !== 'undefined' ? API_URL : 
+                    (window.location.hostname === 'localhost' ? 'http://localhost:3000/api' : 'https://evie-system.vercel.app/api');
+                
                 const endpoint = currentTab === 'website' ? '/public/check-website' : '/public/check-account';
                 const body = currentTab === 'website' ? { url: input } : { account: input };
                 
-                const response = await fetch(`${API_URL}${endpoint}`, {
+                console.log('Calling API:', apiUrl + endpoint);
+                
+                const response = await fetch(apiUrl + endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(body)
                 });
                 
                 const data = await response.json();
+                console.log('API response:', data);
                 isAllowed = data.isAllowed;
             } catch (error) {
                 console.error('API check error:', error);
