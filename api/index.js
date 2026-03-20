@@ -36,6 +36,12 @@ const pool = new Pool({
 // Initialize database tables
 async function initializeDatabase() {
     try {
+        console.log('🔄 Initializing database...');
+        
+        // Test connection
+        await pool.query('SELECT NOW()');
+        console.log('✅ Database connection successful');
+        
         // Create users table
         await pool.query(`
             CREATE TABLE IF NOT EXISTS users (
@@ -138,7 +144,8 @@ async function initializeDatabase() {
         
         console.log('✅ Database initialized successfully');
     } catch (error) {
-        console.error('❌ Database initialization error:', error);
+        console.error('❌ Database initialization error:', error.message);
+        console.error('Stack:', error.stack);
     }
 }
 
