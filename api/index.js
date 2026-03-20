@@ -8,6 +8,24 @@ const crypto = require('crypto');
 
 const app = express();
 
+// Try to import Vercel KV, fallback to in-memory if not available
+let kv = null;
+let useKV = false;
+
+try {
+    const kvModule = require('@vercel/kv');
+    kv = kvModule.kv;
+    useKV = true;
+    console.log('✅ Vercel KV enabled');
+} catch (error) {
+    console.log('⚠️ Vercel KV not available, using in-memory storage');
+    useKV = false;
+}
+
+// In-memory fallback storage
+const memoryUsers = new Map();
+const memoryApiKeys = new Map();
+
 app.use(helmet({
     contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false
@@ -26,45 +44,274 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-// In-memory storage
-const users = new Map();
-const apiKeys = new Map();
+// Database abstraction layer
+const db = {
+    async getUser(username) {
+        if (useKV) {
+            try {
+                return await kv.hgetall(`user:${username}`);
+            } catch (error) {
+                console.error('KV getUser error:', error);
+                return memoryUsers.get(username);
+            }
+        }
+        return memoryUsers.get(username);
+    },
+    
+    async setUser(username, userData) {
+        if (useKV) {
+            try {
+                await kv.hset(`user:${username}`, userData);
+            } catch (error) {
+                console.error('KV setUser error:', error);
+            }
+        }
+        memoryUsers.set(username, userData);
+    },
+    
+    async deleteUser(username) {
+        if (useKV) {
+            try {
+                await kv.del(`user:${username}`);
+                await kv.del(`user:${username}:websites`);
+                await kv.del(`user:${username}:accounts`);
+            } catch (error) {
+                console.error('KV deleteUser error:', error);
+            }
+        }
+        memoryUsers.delete(username);
+    },
+    
+    async getWebsites(username) {
+        if (useKV) {
+            try {
+                const websites = await kv.smembers(`user:${username}:websites`);
+                return websites || [];
+            } catch (error) {
+                console.error('KV getWebsites error:', error);
+                const user = memoryUsers.get(username);
+                return user ? user.websites : [];
+            }
+        }
+        const user = memoryUsers.get(username);
+        return user ? user.websites : [];
+    },
+    
+    async addWebsite(username, domain) {
+        if (useKV) {
+            try {
+                await kv.sadd(`user:${username}:websites`, domain);
+            } catch (error) {
+                console.error('KV addWebsite error:', error);
+            }
+        }
+        const user = memoryUsers.get(username);
+        if (user && !user.websites.includes(domain)) {
+            user.websites.push(domain);
+        }
+    },
+    
+    async removeWebsite(username, domain) {
+        if (useKV) {
+            try {
+                await kv.srem(`user:${username}:websites`, domain);
+            } catch (error) {
+                console.error('KV removeWebsite error:', error);
+            }
+        }
+        const user = memoryUsers.get(username);
+        if (user) {
+            user.websites = user.websites.filter(w => w !== domain);
+        }
+    },
+    
+    async getAccounts(username) {
+        if (useKV) {
+            try {
+                const accounts = await kv.smembers(`user:${username}:accounts`);
+                return accounts || [];
+            } catch (error) {
+                console.error('KV getAccounts error:', error);
+                const user = memoryUsers.get(username);
+                return user ? user.accounts : [];
+            }
+        }
+        const user = memoryUsers.get(username);
+        return user ? user.accounts : [];
+    },
+    
+    async addAccount(username, account) {
+        if (useKV) {
+            try {
+                await kv.sadd(`user:${username}:accounts`, account);
+            } catch (error) {
+                console.error('KV addAccount error:', error);
+            }
+        }
+        const user = memoryUsers.get(username);
+        if (user && !user.accounts.includes(account)) {
+            user.accounts.push(account);
+        }
+    },
+    
+    async removeAccount(username, account) {
+        if (useKV) {
+            try {
+                await kv.srem(`user:${username}:accounts`, account);
+            } catch (error) {
+                console.error('KV removeAccount error:', error);
+            }
+        }
+        const user = memoryUsers.get(username);
+        if (user) {
+            user.accounts = user.accounts.filter(a => a !== account);
+        }
+    },
+    
+    async getAllUsers() {
+        if (useKV) {
+            try {
+                const keys = await kv.keys('user:*');
+                const users = [];
+                
+                for (const key of keys) {
+                    if (key.includes(':websites') || key.includes(':accounts')) continue;
+                    
+                    const user = await kv.hgetall(key);
+                    if (user && user.username) {
+                        const websiteCount = await kv.scard(`${key}:websites`) || 0;
+                        const accountCount = await kv.scard(`${key}:accounts`) || 0;
+                        
+                        users.push({
+                            id: user.id,
+                            username: user.username,
+                            role: user.role,
+                            createdAt: user.createdAt,
+                            websiteCount,
+                            accountCount
+                        });
+                    }
+                }
+                
+                return users;
+            } catch (error) {
+                console.error('KV getAllUsers error:', error);
+                return Array.from(memoryUsers.values()).map(user => ({
+                    id: user.id,
+                    username: user.username,
+                    role: user.role,
+                    createdAt: user.createdAt,
+                    websiteCount: user.websites.length,
+                    accountCount: user.accounts.length
+                }));
+            }
+        }
+        
+        return Array.from(memoryUsers.values()).map(user => ({
+            id: user.id,
+            username: user.username,
+            role: user.role,
+            createdAt: user.createdAt,
+            websiteCount: user.websites.length,
+            accountCount: user.accounts.length
+        }));
+    },
+    
+    async setApiKey(key, data, ttl = 86400) {
+        if (useKV) {
+            try {
+                await kv.hset(`apikey:${key}`, data);
+                await kv.expire(`apikey:${key}`, ttl);
+            } catch (error) {
+                console.error('KV setApiKey error:', error);
+            }
+        }
+        memoryApiKeys.set(key, data);
+    },
+    
+    async getApiKey(key) {
+        if (useKV) {
+            try {
+                return await kv.hgetall(`apikey:${key}`);
+            } catch (error) {
+                console.error('KV getApiKey error:', error);
+                return memoryApiKeys.get(key);
+            }
+        }
+        return memoryApiKeys.get(key);
+    },
+    
+    async deleteApiKey(key) {
+        if (useKV) {
+            try {
+                await kv.del(`apikey:${key}`);
+            } catch (error) {
+                console.error('KV deleteApiKey error:', error);
+            }
+        }
+        memoryApiKeys.delete(key);
+    }
+};
 
 // Initialize default data
-function initializeDatabase() {
+async function initializeDatabase() {
     const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Admin@2026!';
     const adminPassword = bcrypt.hashSync(ADMIN_PASSWORD, 10);
     
-    users.set('admin', {
+    const adminData = {
         id: 'admin',
         username: 'admin',
         password: adminPassword,
         role: 'admin',
-        websites: ['ok168.pro', 'ok168.com', 'ok168.net', 'ok168.vip'],
-        accounts: ['admin123', 'user001', 'vip888', 'test123'],
         createdAt: new Date().toISOString()
+    };
+    
+    await db.setUser('admin', adminData);
+    
+    // Set default websites and accounts for admin
+    if (useKV) {
+        try {
+            await kv.sadd('user:admin:websites', 'ok168.pro', 'ok168.com', 'ok168.net', 'ok168.vip');
+            await kv.sadd('user:admin:accounts', 'admin123', 'user001', 'vip888', 'test123');
+        } catch (error) {
+            console.error('KV init error:', error);
+        }
+    }
+    
+    // Also set in memory
+    memoryUsers.set('admin', {
+        ...adminData,
+        websites: ['ok168.pro', 'ok168.com', 'ok168.net', 'ok168.vip'],
+        accounts: ['admin123', 'user001', 'vip888', 'test123']
     });
     
     // Default users
-    users.set('1ec168', {
-        id: '1ec168',
-        username: '1ec168',
-        password: bcrypt.hashSync('123456', 10),
-        role: 'user',
-        websites: [],
-        accounts: [],
-        createdAt: new Date().toISOString()
-    });
+    const defaultUsers = [
+        { username: '1ec168', password: '123456', role: 'user' },
+        { username: 'user1', password: '123456', role: 'user' }
+    ];
     
-    users.set('user1', {
-        id: 'user1',
-        username: 'user1',
-        password: bcrypt.hashSync('123456', 10),
-        role: 'user',
-        websites: [],
-        accounts: [],
-        createdAt: new Date().toISOString()
-    });
+    for (const userData of defaultUsers) {
+        const hashedPassword = bcrypt.hashSync(userData.password, 10);
+        const user = {
+            id: userData.username,
+            username: userData.username,
+            password: hashedPassword,
+            role: userData.role,
+            createdAt: new Date().toISOString()
+        };
+        
+        await db.setUser(userData.username, user);
+        memoryUsers.set(userData.username, {
+            ...user,
+            websites: [],
+            accounts: []
+        });
+    }
+    
+    console.log('✅ Database initialized');
+    console.log('👤 Admin username: admin');
+    console.log('🔑 Admin password:', ADMIN_PASSWORD);
 }
 
 initializeDatabase();
@@ -73,11 +320,11 @@ function generateApiKey() {
     return crypto.randomBytes(32).toString('hex');
 }
 
-function createApiKey(userId, expiresIn = 24 * 60 * 60 * 1000) {
+async function createApiKey(userId, expiresIn = 24 * 60 * 60 * 1000) {
     const key = generateApiKey();
     const expiresAt = new Date(Date.now() + expiresIn);
     
-    apiKeys.set(key, {
+    await db.setApiKey(key, {
         userId,
         createdAt: new Date().toISOString(),
         expiresAt: expiresAt.toISOString()
@@ -86,12 +333,12 @@ function createApiKey(userId, expiresIn = 24 * 60 * 60 * 1000) {
     return { key, expiresAt };
 }
 
-function validateApiKey(key) {
-    const keyData = apiKeys.get(key);
+async function validateApiKey(key) {
+    const keyData = await db.getApiKey(key);
     if (!keyData) return null;
     
     if (new Date() > new Date(keyData.expiresAt)) {
-        apiKeys.delete(key);
+        await db.deleteApiKey(key);
         return null;
     }
     
@@ -109,15 +356,15 @@ const authenticateToken = (req, res, next) => {
     });
 };
 
-const authenticateApiKey = (req, res, next) => {
+const authenticateApiKey = async (req, res, next) => {
     const apiKey = req.headers['x-api-key'];
     if (!apiKey) return res.status(401).json({ error: 'API key required' });
     
-    const keyData = validateApiKey(apiKey);
+    const keyData = await validateApiKey(apiKey);
     if (!keyData) return res.status(401).json({ error: 'Invalid or expired API key' });
     
     req.userId = keyData.userId;
-    const user = users.get(keyData.userId);
+    const user = await db.getUser(keyData.userId);
     req.user = user;
     next();
 };
@@ -132,22 +379,23 @@ app.post('/api/auth/register', async (req, res) => {
         const { username, password } = req.body;
         if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
         
-        if (users.has(username)) {
+        const existingUser = await db.getUser(username);
+        if (existingUser && existingUser.username) {
             return res.status(400).json({ error: 'Username already exists' });
         }
         
         const userId = crypto.randomBytes(16).toString('hex');
         const hashedPassword = await bcrypt.hash(password, 10);
         
-        users.set(username, {
+        const userData = {
             id: userId,
             username,
             password: hashedPassword,
             role: 'user',
-            websites: [],
-            accounts: [],
             createdAt: new Date().toISOString()
-        });
+        };
+        
+        await db.setUser(username, userData);
         
         const token = jwt.sign({ id: userId, username, role: 'user' }, process.env.JWT_SECRET || 'your-secret-key', { expiresIn: '7d' });
         res.json({ success: true, token, user: { id: userId, username, role: 'user' } });
@@ -160,8 +408,8 @@ app.post('/api/auth/login', async (req, res) => {
     try {
         const { username, password } = req.body;
         
-        const user = users.get(username);
-        if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+        const user = await db.getUser(username);
+        if (!user || !user.username) return res.status(401).json({ error: 'Invalid credentials' });
         
         const validPassword = await bcrypt.compare(password, user.password);
         if (!validPassword) return res.status(401).json({ error: 'Invalid credentials' });
@@ -173,62 +421,48 @@ app.post('/api/auth/login', async (req, res) => {
     }
 });
 
-app.post('/api/auth/generate-key', authenticateToken, (req, res) => {
-    const { key, expiresAt } = createApiKey(req.user.id);
+app.post('/api/auth/generate-key', authenticateToken, async (req, res) => {
+    const { key, expiresAt } = await createApiKey(req.user.id);
     res.json({ success: true, apiKey: key, expiresAt, message: 'API key will auto-expire in 24 hours' });
 });
 
-app.get('/api/websites', authenticateApiKey, (req, res) => {
-    const user = users.get(req.userId);
-    res.json({ success: true, websites: user.websites || [] });
+app.get('/api/websites', authenticateApiKey, async (req, res) => {
+    const websites = await db.getWebsites(req.userId);
+    res.json({ success: true, websites });
 });
 
-app.post('/api/websites', authenticateApiKey, (req, res) => {
+app.post('/api/websites', authenticateApiKey, async (req, res) => {
     const { domain } = req.body;
     if (!domain) return res.status(400).json({ error: 'Domain required' });
     
-    const user = users.get(req.userId);
     const normalizedDomain = domain.toLowerCase().trim();
-    
-    if (!user.websites.includes(normalizedDomain)) {
-        user.websites.push(normalizedDomain);
-    }
-    
+    await db.addWebsite(req.userId, normalizedDomain);
     res.json({ success: true, message: 'Website added', domain: normalizedDomain });
 });
 
-app.delete('/api/websites/:domain', authenticateApiKey, (req, res) => {
+app.delete('/api/websites/:domain', authenticateApiKey, async (req, res) => {
     const domain = req.params.domain.toLowerCase();
-    const user = users.get(req.userId);
-    
-    user.websites = user.websites.filter(w => w !== domain);
+    await db.removeWebsite(req.userId, domain);
     res.json({ success: true, message: 'Website removed' });
 });
 
-app.get('/api/accounts', authenticateApiKey, (req, res) => {
-    const user = users.get(req.userId);
-    res.json({ success: true, accounts: user.accounts || [] });
+app.get('/api/accounts', authenticateApiKey, async (req, res) => {
+    const accounts = await db.getAccounts(req.userId);
+    res.json({ success: true, accounts });
 });
 
-app.post('/api/accounts', authenticateApiKey, (req, res) => {
+app.post('/api/accounts', authenticateApiKey, async (req, res) => {
     const { account } = req.body;
     if (!account) return res.status(400).json({ error: 'Account required' });
     
-    const user = users.get(req.userId);
     const normalizedAccount = account.toLowerCase().trim();
-    
-    if (!user.accounts.includes(normalizedAccount)) {
-        user.accounts.push(normalizedAccount);
-    }
-    
+    await db.addAccount(req.userId, normalizedAccount);
     res.json({ success: true, message: 'Account added', account: normalizedAccount });
 });
 
-app.delete('/api/accounts/:account', authenticateApiKey, (req, res) => {
+app.delete('/api/accounts/:account', authenticateApiKey, async (req, res) => {
     const account = req.params.account.toLowerCase();
-    const user = users.get(req.userId);
-    
-    user.accounts = user.accounts.filter(a => a !== account);
+    await db.removeAccount(req.userId, account);
     res.json({ success: true, message: 'Account removed' });
 });
 
@@ -238,8 +472,8 @@ app.post('/api/check-website', authenticateApiKey, async (req, res) => {
         if (!url) return res.status(400).json({ error: 'URL required' });
         
         const domain = url.toLowerCase().trim().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '').split('?')[0].split('#')[0];
-        const user = users.get(req.userId);
-        const isAllowed = user.websites.some(allowed => domain === allowed || domain.endsWith('.' + allowed));
+        const websites = await db.getWebsites(req.userId);
+        const isAllowed = websites.some(allowed => domain === allowed || domain.endsWith('.' + allowed));
         
         await new Promise(resolve => setTimeout(resolve, 1000));
         res.json({ success: true, domain, isAllowed, timestamp: new Date().toISOString() });
@@ -254,8 +488,8 @@ app.post('/api/check-account', authenticateApiKey, async (req, res) => {
         if (!account) return res.status(400).json({ error: 'Account required' });
         
         const normalizedAccount = account.toLowerCase().trim();
-        const user = users.get(req.userId);
-        const isAllowed = user.accounts.includes(normalizedAccount);
+        const accounts = await db.getAccounts(req.userId);
+        const isAllowed = accounts.includes(normalizedAccount);
         
         await new Promise(resolve => setTimeout(resolve, 1000));
         res.json({ success: true, account: normalizedAccount, isAllowed, timestamp: new Date().toISOString() });
@@ -280,18 +514,10 @@ app.post('/api/clean', authenticateApiKey, async (req, res) => {
     }
 });
 
-app.get('/api/admin/users', authenticateToken, requireAdmin, (req, res) => {
+app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) => {
     try {
-        const userList = Array.from(users.values()).map(user => ({
-            id: user.id,
-            username: user.username,
-            role: user.role,
-            createdAt: user.createdAt,
-            websiteCount: user.websites.length,
-            accountCount: user.accounts.length
-        }));
-        
-        res.json({ success: true, users: userList });
+        const users = await db.getAllUsers();
+        res.json({ success: true, users });
     } catch (error) {
         res.status(500).json({ error: 'Failed to load users' });
     }
@@ -302,22 +528,23 @@ app.post('/api/admin/create-user', authenticateToken, requireAdmin, async (req, 
         const { username, password } = req.body;
         if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
         
-        if (users.has(username)) {
+        const existingUser = await db.getUser(username);
+        if (existingUser && existingUser.username) {
             return res.status(400).json({ error: 'Username already exists' });
         }
         
         const userId = crypto.randomBytes(16).toString('hex');
         const hashedPassword = await bcrypt.hash(password, 10);
         
-        users.set(username, {
+        const userData = {
             id: userId,
             username,
             password: hashedPassword,
             role: 'user',
-            websites: [],
-            accounts: [],
             createdAt: new Date().toISOString()
-        });
+        };
+        
+        await db.setUser(username, userData);
         
         res.json({ success: true, message: 'User created', user: { id: userId, username, role: 'user' } });
     } catch (error) {
@@ -326,44 +553,49 @@ app.post('/api/admin/create-user', authenticateToken, requireAdmin, async (req, 
 });
 
 app.post('/api/admin/reset-password', authenticateToken, requireAdmin, async (req, res) => {
-    const { userId, newPassword } = req.body;
-    if (!userId || !newPassword) return res.status(400).json({ error: 'User ID and new password required' });
-    
-    const user = Array.from(users.values()).find(u => u.id === userId);
-    if (!user) return res.status(404).json({ error: 'User not found' });
-    
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-    user.password = hashedPassword;
-    
-    res.json({ success: true, message: 'Password reset successfully' });
+    try {
+        const { userId, newPassword } = req.body;
+        if (!userId || !newPassword) return res.status(400).json({ error: 'User ID and new password required' });
+        
+        const users = await db.getAllUsers();
+        const targetUser = users.find(u => u.id === userId);
+        if (!targetUser) return res.status(404).json({ error: 'User not found' });
+        
+        const user = await db.getUser(targetUser.username);
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        
+        user.password = hashedPassword;
+        await db.setUser(targetUser.username, user);
+        
+        res.json({ success: true, message: 'Password reset successfully' });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to reset password' });
+    }
 });
 
-app.delete('/api/admin/users/:userId', authenticateToken, requireAdmin, (req, res) => {
-    const { userId } = req.params;
-    if (userId === 'admin') return res.status(400).json({ error: 'Cannot delete admin user' });
-    
-    const user = Array.from(users.entries()).find(([, u]) => u.id === userId);
-    if (!user) return res.status(404).json({ error: 'User not found' });
-    
-    users.delete(user[0]);
-    
-    // Remove associated API keys
-    for (const [key, data] of apiKeys.entries()) {
-        if (data.userId === userId) {
-            apiKeys.delete(key);
-        }
+app.delete('/api/admin/users/:userId', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { userId } = req.params;
+        if (userId === 'admin') return res.status(400).json({ error: 'Cannot delete admin user' });
+        
+        const users = await db.getAllUsers();
+        const targetUser = users.find(u => u.id === userId);
+        if (!targetUser) return res.status(404).json({ error: 'User not found' });
+        
+        await db.deleteUser(targetUser.username);
+        
+        res.json({ success: true, message: 'User deleted' });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to delete user' });
     }
-    
-    res.json({ success: true, message: 'User deleted' });
 });
 
 app.get('/api/health', (req, res) => {
     res.json({ 
         status: 'OK', 
         timestamp: new Date().toISOString(),
-        storage: 'in-memory',
-        users: users.size,
-        apiKeys: apiKeys.size
+        storage: useKV ? 'Vercel KV (Redis)' : 'In-Memory',
+        kvEnabled: useKV
     });
 });
 
