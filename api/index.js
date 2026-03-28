@@ -49,6 +49,9 @@ async function initializeDatabase() {
                 username VARCHAR(255) UNIQUE NOT NULL,
                 password VARCHAR(255) NOT NULL,
                 role VARCHAR(50) NOT NULL,
+                bot_enabled BOOLEAN DEFAULT FALSE,
+                bot_api_url VARCHAR(500),
+                bot_api_key VARCHAR(500),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
@@ -474,6 +477,79 @@ app.get('/api/health', (req, res) => {
     });
 });
 
+// Get bot config
+app.get('/api/bot-config', authenticateApiKey, async (req, res) => {
+    try {
+        const result = await pool.query(
+            'SELECT bot_enabled, bot_api_url FROM users WHERE id = $1',
+            [req.userId]
+        );
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        
+        const user = result.rows[0];
+        res.json({
+            success: true,
+            bot_enabled: user.bot_enabled || false,
+            bot_api_url: user.bot_api_url || ''
+        });
+    } catch (error) {
+        console.error('Get bot config error:', error);
+        res.status(500).json({ error: 'Failed to get bot config' });
+    }
+});
+
+// Update bot config
+app.post('/api/bot-config', authenticateApiKey, async (req, res) => {
+    try {
+        const { bot_enabled, bot_api_url, bot_api_key } = req.body;
+        
+        await pool.query(
+            'UPDATE users SET bot_enabled = $1, bot_api_url = $2, bot_api_key = $3 WHERE id = $4',
+            [bot_enabled, bot_api_url, bot_api_key, req.userId]
+        );
+        
+        res.json({ success: true, message: 'Bot config updated' });
+    } catch (error) {
+        console.error('Update bot config error:', error);
+        res.status(500).json({ error: 'Failed to update bot config' });
+    }
+});
+
+// Test bot connection
+app.post('/api/bot-config/test', authenticateApiKey, async (req, res) => {
+    try {
+        const { bot_api_url, bot_api_key } = req.body;
+        
+        if (!bot_api_url) {
+            return res.status(400).json({ error: 'Bot API URL required' });
+        }
+        
+        // Test connection to bot
+        const response = await fetch(bot_api_url, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${bot_api_key}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ player: 'test_player' }),
+            timeout: 5000
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            res.json({ success: true, message: 'Bot connection successful', data });
+        } else {
+            res.json({ success: false, message: `Bot returned status ${response.status}` });
+        }
+    } catch (error) {
+        console.error('Test bot error:', error);
+        res.json({ success: false, message: `Connection failed: ${error.message}` });
+    }
+});
+
 // Public endpoint to check website (no auth required)
 app.post('/api/public/check-website', async (req, res) => {
     try {
@@ -503,7 +579,7 @@ app.post('/api/public/check-account', async (req, res) => {
         
         const normalizedAccount = account.toLowerCase().trim();
         
-        // Get all accounts from all users
+        // Get all accounts from all users (both manual and bot)
         const result = await pool.query('SELECT DISTINCT account FROM accounts');
         const allAccounts = result.rows.map(row => row.account);
         const isAllowed = allAccounts.includes(normalizedAccount);
@@ -512,6 +588,81 @@ app.post('/api/public/check-account', async (req, res) => {
         res.json({ success: true, account: normalizedAccount, isAllowed, timestamp: new Date().toISOString() });
     } catch (error) {
         console.error('Public check account error:', error);
+        res.status(500).json({ error: 'Check failed' });
+    }
+});
+
+// Authenticated check account (with bot support)
+app.post('/api/check-account-with-bot', authenticateApiKey, async (req, res) => {
+    try {
+        const { account } = req.body;
+        if (!account) return res.status(400).json({ error: 'Account required' });
+        
+        const normalizedAccount = account.toLowerCase().trim();
+        
+        // Get user's bot config
+        const userResult = await pool.query(
+            'SELECT bot_enabled, bot_api_url, bot_api_key FROM users WHERE id = $1',
+            [req.userId]
+        );
+        
+        const user = userResult.rows[0];
+        let isAllowed = false;
+        let source = 'database';
+        
+        if (user && user.bot_enabled && user.bot_api_url) {
+            // Try bot first
+            try {
+                console.log('Checking via bot:', user.bot_api_url);
+                const botResponse = await fetch(user.bot_api_url, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${user.bot_api_key}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ player: normalizedAccount }),
+                    timeout: 5000
+                });
+                
+                if (botResponse.ok) {
+                    const botData = await botResponse.json();
+                    isAllowed = botData.exists || false;
+                    source = 'bot';
+                    console.log('Bot check result:', isAllowed);
+                } else {
+                    throw new Error(`Bot returned status ${botResponse.status}`);
+                }
+            } catch (error) {
+                console.error('Bot check error, falling back to database:', error.message);
+                // Fallback to database
+                const result = await pool.query(
+                    'SELECT account FROM accounts WHERE user_id = $1',
+                    [req.userId]
+                );
+                const accounts = result.rows.map(row => row.account);
+                isAllowed = accounts.includes(normalizedAccount);
+                source = 'database_fallback';
+            }
+        } else {
+            // Check in database (manual sync)
+            const result = await pool.query(
+                'SELECT account FROM accounts WHERE user_id = $1',
+                [req.userId]
+            );
+            const accounts = result.rows.map(row => row.account);
+            isAllowed = accounts.includes(normalizedAccount);
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        res.json({ 
+            success: true, 
+            account: normalizedAccount, 
+            isAllowed, 
+            source,
+            timestamp: new Date().toISOString() 
+        });
+    } catch (error) {
+        console.error('Check account with bot error:', error);
         res.status(500).json({ error: 'Check failed' });
     }
 });
