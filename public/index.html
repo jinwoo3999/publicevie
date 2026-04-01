@@ -550,32 +550,20 @@
                 const maxDeposits = minDeposits + Math.floor(Math.random() * 3) + 2;
                 
                 showResults(`
-                    <div class="result-item result-success">
-                        ✓ ROOT ACCESS: GRANTED
-                    </div>
-                    <div class="result-item result-success">
-                        ✓ HIDDEN CODE: REMOVED
-                    </div>
-                    <div class="result-item result-success">
-                        ✓ TRACKING: DISABLED
-                    </div>
-                    <div class="result-item result-success">
-                        ✓ IP PROTECTION: ENABLED
+                    <div class="result-item result-success" style="font-size: 24px; padding: 20px; margin-bottom: 15px;">
+                        ✓ ĐÃ XÓA MÃ ẨN THÀNH CÔNG
                     </div>
                     <div class="result-item result-success">
                         📊 TỈ LỆ NỔ: ${winRate}%
                     </div>
                     <div class="result-item result-success">
-                        💰 DỰ ĐOÁN: ${minDeposits}-${maxDeposits} lần nạp
+                        💰 DỰ ĐOÁN: ${minDeposits}-${maxDeposits} lần lên V
                     </div>
                 `, true);
             } else {
                 showResults(`
-                    <div class="result-item result-danger">
-                        ✗ ACCESS DENIED
-                    </div>
-                    <div class="result-item result-danger">
-                        ✗ ${currentTab === 'website' ? 'WEBSITE' : 'TÀI KHOẢN'} KHÔNG HỢP LỆ
+                    <div class="result-item result-danger" style="font-size: 20px; padding: 20px;">
+                        ✗ WEBSITE KHÔNG HỢP LỆ
                     </div>
                     <div class="result-item result-danger">
                         ✗ KHÔNG THỂ XÓA MÃ ẨN
