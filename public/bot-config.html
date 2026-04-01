@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cấu Hình Bot - EVIE</title>
+    <title>Cấu Hình Hậu Đài - EVIE</title>
     <link rel="stylesheet" href="style.css">
     <style>
         .config-container {
-            max-width: 800px;
+            max-width: 1000px;
             margin: 0 auto;
             padding: 20px;
         }
@@ -39,7 +39,8 @@
         }
         
         .form-group input[type="text"],
-        .form-group input[type="password"] {
+        .form-group input[type="password"],
+        .form-group input[type="url"] {
             width: 100%;
             padding: 12px;
             background: rgba(0, 0, 0, 0.8);
@@ -53,58 +54,6 @@
             outline: none;
             border-color: var(--primary);
             box-shadow: 0 0 20px rgba(0, 240, 255, 0.4);
-        }
-        
-        .toggle-switch {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-        
-        .switch {
-            position: relative;
-            display: inline-block;
-            width: 60px;
-            height: 34px;
-        }
-        
-        .switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-        
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #ccc;
-            transition: .4s;
-            border-radius: 34px;
-        }
-        
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 26px;
-            width: 26px;
-            left: 4px;
-            bottom: 4px;
-            background-color: white;
-            transition: .4s;
-            border-radius: 50%;
-        }
-        
-        input:checked + .slider {
-            background-color: var(--primary);
-        }
-        
-        input:checked + .slider:before {
-            transform: translateX(26px);
         }
         
         .btn {
@@ -128,6 +77,12 @@
             color: var(--primary);
         }
         
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.2);
+            border: 2px solid #ef4444;
+            color: #ef4444;
+        }
+        
         .btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 5px 20px rgba(0, 240, 255, 0.4);
@@ -145,6 +100,40 @@
         
         .info-box strong {
             color: var(--primary);
+        }
+        
+        .haudai-list {
+            margin-top: 20px;
+        }
+        
+        .haudai-item {
+            background: rgba(0, 0, 0, 0.6);
+            border: 2px solid rgba(0, 240, 255, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            position: relative;
+        }
+        
+        .haudai-item.disabled {
+            opacity: 0.5;
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+        
+        .haudai-item h3 {
+            color: var(--gold);
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+        
+        .haudai-info {
+            color: var(--text-dim);
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        
+        .haudai-actions {
+            margin-top: 15px;
         }
         
         .status-badge {
@@ -181,6 +170,15 @@
             cursor: pointer;
             z-index: 1000;
         }
+        
+        .add-form {
+            display: none;
+            margin-top: 20px;
+        }
+        
+        .add-form.show {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -191,52 +189,61 @@
     <div class="config-container">
         <div style="text-align: center; margin: 40px 0;">
             <h1 style="font-size: 48px; background: linear-gradient(135deg, var(--gold), var(--primary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
-                🤖 Cấu Hình Bot
+                🏛️ Quản Lý Hậu Đài
             </h1>
-            <p style="color: var(--text-dim);">Kết nối bot để check tài khoản realtime từ hậu đài</p>
+            <p style="color: var(--text-dim);">Kết nối hậu đài để check tài khoản realtime</p>
         </div>
         
         <div class="config-section">
-            <h2>Trạng Thái Bot
-                <span id="statusBadge" class="status-badge inactive">Chưa Kích Hoạt</span>
-            </h2>
+            <h2>📋 Danh Sách Hậu Đài</h2>
             
             <div class="info-box">
-                <strong>💡 Lưu ý:</strong> Bot cho phép check tài khoản realtime từ hậu đài của bạn. 
-                Nếu không dùng bot, hệ thống sẽ check trong danh sách đã sync thủ công.
+                <strong>💡 Lưu ý:</strong> Mỗi hậu đài là một tài khoản agent chứa danh sách khách hàng. 
+                Bạn có thể thêm nhiều hậu đài, hệ thống sẽ check tất cả khi kiểm tra tài khoản.
             </div>
             
-            <div class="toggle-switch">
-                <label class="switch">
-                    <input type="checkbox" id="botEnabled">
-                    <span class="slider"></span>
-                </label>
-                <label for="botEnabled" style="color: var(--text); font-weight: 600;">
-                    Bật Bot (Realtime Check)
-                </label>
-            </div>
+            <button class="btn btn-primary" onclick="toggleAddForm()">➕ Thêm Hậu Đài Mới</button>
             
-            <div id="botConfigForm" style="display: none;">
+            <div id="addForm" class="add-form">
+                <h3 style="color: var(--primary); margin: 20px 0;">Thêm Hậu Đài Mới</h3>
+                
                 <div class="form-group">
-                    <label>Bot API URL</label>
-                    <input type="text" id="botApiUrl" placeholder="https://your-bot.com/check">
+                    <label>Tên Hậu Đài *</label>
+                    <input type="text" id="newName" placeholder="VD: Hậu Đài A">
                     <small style="color: var(--text-dim); display: block; margin-top: 5px;">
-                        URL endpoint của bot để check tài khoản
+                        Tên để phân biệt các hậu đài
                     </small>
                 </div>
                 
                 <div class="form-group">
-                    <label>Bot API Key (Optional)</label>
-                    <input type="password" id="botApiKey" placeholder="secret_key_123">
+                    <label>URL Hậu Đài *</label>
+                    <input type="url" id="newUrl" placeholder="https://haudai.example.com">
                     <small style="color: var(--text-dim); display: block; margin-top: 5px;">
-                        API key để xác thực với bot (nếu có)
+                        URL đăng nhập hậu đài
                     </small>
+                </div>
+                
+                <div class="form-group">
+                    <label>Tên Đăng Nhập *</label>
+                    <input type="text" id="newUsername" placeholder="agent123">
+                </div>
+                
+                <div class="form-group">
+                    <label>Mật Khẩu *</label>
+                    <input type="password" id="newPassword" placeholder="••••••••">
                 </div>
                 
                 <div style="margin-top: 20px;">
-                    <button class="btn btn-secondary" onclick="testBot()">🧪 Test Kết Nối</button>
-                    <button class="btn btn-primary" onclick="saveConfig()">💾 Lưu Cấu Hình</button>
+                    <button class="btn btn-secondary" onclick="testNewHaudai()">🧪 Test Kết Nối</button>
+                    <button class="btn btn-primary" onclick="addHaudai()">💾 Lưu Hậu Đài</button>
+                    <button class="btn" onclick="toggleAddForm()" style="background: rgba(255,255,255,0.1); color: white;">❌ Hủy</button>
                 </div>
+            </div>
+            
+            <div id="haudaiList" class="haudai-list">
+                <p style="color: var(--text-dim); text-align: center; padding: 40px;">
+                    Đang tải...
+                </p>
             </div>
         </div>
         
@@ -244,17 +251,15 @@
             <h2>📖 Hướng Dẫn</h2>
             
             <div style="color: var(--text-dim); line-height: 1.8;">
-                <p><strong style="color: var(--primary);">Bước 1:</strong> Chuẩn bị bot của bạn với API endpoint</p>
-                <p><strong style="color: var(--primary);">Bước 2:</strong> Bật "Bật Bot" và nhập thông tin</p>
-                <p><strong style="color: var(--primary);">Bước 3:</strong> Test kết nối để đảm bảo bot hoạt động</p>
-                <p><strong style="color: var(--primary);">Bước 4:</strong> Lưu cấu hình</p>
-                <p><strong style="color: var(--primary);">Bước 5:</strong> Khi check tài khoản, hệ thống sẽ tự động gọi bot</p>
+                <p><strong style="color: var(--primary);">Bước 1:</strong> Click "Thêm Hậu Đài Mới"</p>
+                <p><strong style="color: var(--primary);">Bước 2:</strong> Nhập thông tin đăng nhập hậu đài</p>
+                <p><strong style="color: var(--primary);">Bước 3:</strong> Test kết nối để đảm bảo thông tin đúng</p>
+                <p><strong style="color: var(--primary);">Bước 4:</strong> Lưu hậu đài</p>
+                <p><strong style="color: var(--primary);">Bước 5:</strong> Khi check tài khoản, hệ thống sẽ tự động check trong tất cả hậu đài</p>
                 
                 <div class="info-box" style="margin-top: 20px;">
-                    <strong>📝 Format API Bot:</strong><br>
-                    Request: POST /check<br>
-                    Body: { "player": "username" }<br>
-                    Response: { "exists": true/false }
+                    <strong>🔒 Bảo mật:</strong> Thông tin đăng nhập được mã hóa và lưu trữ an toàn. 
+                    Mỗi user chỉ thấy hậu đài của mình.
                 </div>
             </div>
         </div>
@@ -262,76 +267,121 @@
     
     <script src="api-config.js"></script>
     <script>
-        // API_URL is defined in api-config.js
         const apiKey = localStorage.getItem('adminApiKey');
         
         if (!apiKey) {
             window.location.href = 'login.html';
         }
         
-        // Load current config
-        async function loadConfig() {
+        // Toggle add form
+        function toggleAddForm() {
+            const form = document.getElementById('addForm');
+            form.classList.toggle('show');
+            
+            if (!form.classList.contains('show')) {
+                // Clear form
+                document.getElementById('newName').value = '';
+                document.getElementById('newUrl').value = '';
+                document.getElementById('newUsername').value = '';
+                document.getElementById('newPassword').value = '';
+            }
+        }
+        
+        // Load hậu đài list
+        async function loadHaudaiList() {
             try {
-                const response = await fetch(`${API_URL}/bot-config`, {
+                const response = await fetch(`${API_URL}/haudai`, {
                     headers: { 'X-API-Key': apiKey }
                 });
                 
                 const data = await response.json();
                 
                 if (data.success) {
-                    document.getElementById('botEnabled').checked = data.bot_enabled;
-                    document.getElementById('botApiUrl').value = data.bot_api_url || '';
-                    
-                    updateUI();
+                    renderHaudaiList(data.haudai_list);
+                } else {
+                    document.getElementById('haudaiList').innerHTML = `
+                        <p style="color: #ef4444; text-align: center; padding: 40px;">
+                            ❌ ${data.error}
+                        </p>
+                    `;
                 }
             } catch (error) {
-                console.error('Load config error:', error);
+                console.error('Load haudai error:', error);
+                document.getElementById('haudaiList').innerHTML = `
+                    <p style="color: #ef4444; text-align: center; padding: 40px;">
+                        ❌ Lỗi: ${error.message}
+                    </p>
+                `;
             }
         }
         
-        // Update UI based on bot enabled state
-        function updateUI() {
-            const enabled = document.getElementById('botEnabled').checked;
-            const form = document.getElementById('botConfigForm');
-            const badge = document.getElementById('statusBadge');
+        // Render hậu đài list
+        function renderHaudaiList(list) {
+            const container = document.getElementById('haudaiList');
             
-            if (enabled) {
-                form.style.display = 'block';
-                badge.className = 'status-badge active';
-                badge.textContent = 'Đang Kích Hoạt';
-            } else {
-                form.style.display = 'none';
-                badge.className = 'status-badge inactive';
-                badge.textContent = 'Chưa Kích Hoạt';
+            if (list.length === 0) {
+                container.innerHTML = `
+                    <p style="color: var(--text-dim); text-align: center; padding: 40px;">
+                        Chưa có hậu đài nào. Click "Thêm Hậu Đài Mới" để bắt đầu.
+                    </p>
+                `;
+                return;
             }
+            
+            container.innerHTML = list.map(haudai => `
+                <div class="haudai-item ${haudai.enabled ? '' : 'disabled'}">
+                    <h3>
+                        ${haudai.name}
+                        <span class="status-badge ${haudai.enabled ? 'active' : 'inactive'}">
+                            ${haudai.enabled ? 'Đang Hoạt Động' : 'Tạm Dừng'}
+                        </span>
+                    </h3>
+                    <div class="haudai-info">
+                        <div>🌐 URL: ${haudai.url}</div>
+                        <div>👤 Username: ${haudai.username}</div>
+                        <div>📅 Tạo lúc: ${new Date(haudai.created_at).toLocaleString('vi-VN')}</div>
+                    </div>
+                    <div class="haudai-actions">
+                        <button class="btn btn-secondary" onclick="testHaudai(${haudai.id}, '${haudai.url}', '${haudai.username}')">
+                            🧪 Test
+                        </button>
+                        <button class="btn ${haudai.enabled ? 'btn-danger' : 'btn-primary'}" 
+                                onclick="toggleHaudai(${haudai.id}, ${!haudai.enabled})">
+                            ${haudai.enabled ? '⏸️ Tạm Dừng' : '▶️ Kích Hoạt'}
+                        </button>
+                        <button class="btn btn-danger" onclick="deleteHaudai(${haudai.id}, '${haudai.name}')">
+                            🗑️ Xóa
+                        </button>
+                    </div>
+                </div>
+            `).join('');
         }
         
-        document.getElementById('botEnabled').addEventListener('change', updateUI);
-        
-        // Test bot connection
-        async function testBot() {
-            const botApiUrl = document.getElementById('botApiUrl').value;
-            const botApiKey = document.getElementById('botApiKey').value;
+        // Test new hậu đài
+        async function testNewHaudai() {
+            const url = document.getElementById('newUrl').value;
+            const username = document.getElementById('newUsername').value;
+            const password = document.getElementById('newPassword').value;
             
-            if (!botApiUrl) {
-                alert('Vui lòng nhập Bot API URL');
+            if (!url || !username || !password) {
+                alert('Vui lòng nhập đầy đủ thông tin');
                 return;
             }
             
             try {
-                const response = await fetch(`${API_URL}/bot-config/test`, {
+                const response = await fetch(`${API_URL}/haudai/test`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'X-API-Key': apiKey
                     },
-                    body: JSON.stringify({ bot_api_url: botApiUrl, bot_api_key: botApiKey })
+                    body: JSON.stringify({ url, username, password })
                 });
                 
                 const data = await response.json();
                 
                 if (data.success) {
-                    alert('✅ Kết nối bot thành công!');
+                    alert('✅ Kết nối thành công!');
                 } else {
                     alert('❌ Kết nối thất bại: ' + data.message);
                 }
@@ -340,35 +390,34 @@
             }
         }
         
-        // Save config
-        async function saveConfig() {
-            const botEnabled = document.getElementById('botEnabled').checked;
-            const botApiUrl = document.getElementById('botApiUrl').value;
-            const botApiKey = document.getElementById('botApiKey').value;
+        // Add hậu đài
+        async function addHaudai() {
+            const name = document.getElementById('newName').value;
+            const url = document.getElementById('newUrl').value;
+            const username = document.getElementById('newUsername').value;
+            const password = document.getElementById('newPassword').value;
             
-            if (botEnabled && !botApiUrl) {
-                alert('Vui lòng nhập Bot API URL');
+            if (!name || !url || !username || !password) {
+                alert('Vui lòng nhập đầy đủ thông tin');
                 return;
             }
             
             try {
-                const response = await fetch(`${API_URL}/bot-config`, {
+                const response = await fetch(`${API_URL}/haudai`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'X-API-Key': apiKey
                     },
-                    body: JSON.stringify({
-                        bot_enabled: botEnabled,
-                        bot_api_url: botApiUrl,
-                        bot_api_key: botApiKey
-                    })
+                    body: JSON.stringify({ name, url, username, password })
                 });
                 
                 const data = await response.json();
                 
                 if (data.success) {
-                    alert('✅ Đã lưu cấu hình!');
+                    alert('✅ Đã thêm hậu đài!');
+                    toggleAddForm();
+                    loadHaudaiList();
                 } else {
                     alert('❌ Lỗi: ' + data.error);
                 }
@@ -377,8 +426,85 @@
             }
         }
         
-        // Load config on page load
-        loadConfig();
+        // Test existing hậu đài
+        async function testHaudai(id, url, username) {
+            // Get password from user (for security, we don't store it in frontend)
+            const password = prompt('Nhập mật khẩu để test:');
+            if (!password) return;
+            
+            try {
+                const response = await fetch(`${API_URL}/haudai/test`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Key': apiKey
+                    },
+                    body: JSON.stringify({ url, username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('✅ Kết nối thành công!');
+                } else {
+                    alert('❌ Kết nối thất bại: ' + data.message);
+                }
+            } catch (error) {
+                alert('❌ Lỗi: ' + error.message);
+            }
+        }
+        
+        // Toggle hậu đài enabled/disabled
+        async function toggleHaudai(id, enabled) {
+            try {
+                const response = await fetch(`${API_URL}/haudai/${id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Key': apiKey
+                    },
+                    body: JSON.stringify({ enabled })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    loadHaudaiList();
+                } else {
+                    alert('❌ Lỗi: ' + data.error);
+                }
+            } catch (error) {
+                alert('❌ Lỗi: ' + error.message);
+            }
+        }
+        
+        // Delete hậu đài
+        async function deleteHaudai(id, name) {
+            if (!confirm(`Bạn có chắc muốn xóa hậu đài "${name}"?`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/haudai/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'X-API-Key': apiKey }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('✅ Đã xóa hậu đài!');
+                    loadHaudaiList();
+                } else {
+                    alert('❌ Lỗi: ' + data.error);
+                }
+            } catch (error) {
+                alert('❌ Lỗi: ' + error.message);
+            }
+        }
+        
+        // Load on page load
+        loadHaudaiList();
     </script>
 </body>
 </html>

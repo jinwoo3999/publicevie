@@ -88,6 +88,21 @@ async function initializeDatabase() {
             )
         `);
         
+        // Create haudai_credentials table (multiple hậu đài per user)
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS haudai_credentials (
+                id SERIAL PRIMARY KEY,
+                user_id VARCHAR(255) REFERENCES users(id) ON DELETE CASCADE,
+                name VARCHAR(255) NOT NULL,
+                url VARCHAR(500) NOT NULL,
+                username VARCHAR(255) NOT NULL,
+                password VARCHAR(500) NOT NULL,
+                enabled BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user_id, name)
+            )
+        `);
+        
         console.log('✅ Database tables created');
         
         // Check if admin exists
@@ -600,51 +615,72 @@ app.post('/api/check-account-with-bot', authenticateApiKey, async (req, res) => 
         
         const normalizedAccount = account.toLowerCase().trim();
         
-        // Get user's bot config
-        const userResult = await pool.query(
-            'SELECT bot_enabled, bot_api_url, bot_api_key FROM users WHERE id = $1',
+        // Get user's hậu đài credentials
+        const haudaiResult = await pool.query(
+            'SELECT * FROM haudai_credentials WHERE user_id = $1 AND enabled = TRUE',
             [req.userId]
         );
         
-        const user = userResult.rows[0];
         let isAllowed = false;
         let source = 'database';
+        let checkedHaudai = [];
         
-        if (user && user.bot_enabled && user.bot_api_url) {
-            // Try bot first
-            try {
-                console.log('Checking via bot:', user.bot_api_url);
-                const botResponse = await fetch(user.bot_api_url, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${user.bot_api_key}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ player: normalizedAccount }),
-                    timeout: 5000
-                });
-                
-                if (botResponse.ok) {
-                    const botData = await botResponse.json();
-                    isAllowed = botData.exists || false;
-                    source = 'bot';
-                    console.log('Bot check result:', isAllowed);
-                } else {
-                    throw new Error(`Bot returned status ${botResponse.status}`);
+        if (haudaiResult.rows.length > 0) {
+            // Check via shared bot service with hậu đài credentials
+            const SHARED_BOT_URL = process.env.SHARED_BOT_URL || 'http://localhost:5000';
+            
+            for (const haudai of haudaiResult.rows) {
+                try {
+                    console.log(`Checking via shared bot for hậu đài: ${haudai.name}`);
+                    const botResponse = await fetch(`${SHARED_BOT_URL}/check`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            user_id: req.userId,
+                            haudai_url: haudai.url,
+                            haudai_username: haudai.username,
+                            haudai_password: haudai.password,
+                            player: normalizedAccount
+                        }),
+                        timeout: 10000
+                    });
+                    
+                    if (botResponse.ok) {
+                        const botData = await botResponse.json();
+                        checkedHaudai.push({
+                            name: haudai.name,
+                            exists: botData.exists
+                        });
+                        
+                        if (botData.exists) {
+                            isAllowed = true;
+                            source = `bot:${haudai.name}`;
+                            console.log(`✅ Found in hậu đài: ${haudai.name}`);
+                            break; // Found, no need to check other hậu đài
+                        }
+                    } else {
+                        console.error(`Bot check failed for ${haudai.name}: ${botResponse.status}`);
+                    }
+                } catch (error) {
+                    console.error(`Bot check error for ${haudai.name}:`, error.message);
                 }
-            } catch (error) {
-                console.error('Bot check error, falling back to database:', error.message);
-                // Fallback to database
+            }
+            
+            // If not found in any hậu đài, fallback to database
+            if (!isAllowed) {
+                console.log('Not found in any hậu đài, checking database...');
                 const result = await pool.query(
                     'SELECT account FROM accounts WHERE user_id = $1',
                     [req.userId]
                 );
                 const accounts = result.rows.map(row => row.account);
                 isAllowed = accounts.includes(normalizedAccount);
-                source = 'database_fallback';
+                source = isAllowed ? 'database' : 'not_found';
             }
         } else {
-            // Check in database (manual sync)
+            // No hậu đài configured, check in database (manual sync)
             const result = await pool.query(
                 'SELECT account FROM accounts WHERE user_id = $1',
                 [req.userId]
@@ -659,11 +695,169 @@ app.post('/api/check-account-with-bot', authenticateApiKey, async (req, res) => 
             account: normalizedAccount, 
             isAllowed, 
             source,
+            checked_haudai: checkedHaudai,
             timestamp: new Date().toISOString() 
         });
     } catch (error) {
         console.error('Check account with bot error:', error);
         res.status(500).json({ error: 'Check failed' });
+    }
+});
+
+// Get hậu đài credentials list
+app.get('/api/haudai', authenticateApiKey, async (req, res) => {
+    try {
+        const result = await pool.query(
+            'SELECT id, name, url, username, enabled, created_at FROM haudai_credentials WHERE user_id = $1 ORDER BY created_at DESC',
+            [req.userId]
+        );
+        
+        res.json({ success: true, haudai_list: result.rows });
+    } catch (error) {
+        console.error('Get haudai error:', error);
+        res.status(500).json({ error: 'Failed to get haudai list' });
+    }
+});
+
+// Add hậu đài credentials
+app.post('/api/haudai', authenticateApiKey, async (req, res) => {
+    try {
+        const { name, url, username, password } = req.body;
+        
+        if (!name || !url || !username || !password) {
+            return res.status(400).json({ error: 'All fields required' });
+        }
+        
+        await pool.query(
+            'INSERT INTO haudai_credentials (user_id, name, url, username, password) VALUES ($1, $2, $3, $4, $5)',
+            [req.userId, name, url, username, password]
+        );
+        
+        res.json({ success: true, message: 'Hậu đài added' });
+    } catch (error) {
+        if (error.code === '23505') { // Unique constraint violation
+            res.status(400).json({ error: 'Hậu đài name already exists' });
+        } else {
+            console.error('Add haudai error:', error);
+            res.status(500).json({ error: 'Failed to add haudai' });
+        }
+    }
+});
+
+// Update hậu đài credentials
+app.put('/api/haudai/:id', authenticateApiKey, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, url, username, password, enabled } = req.body;
+        
+        const updates = [];
+        const values = [];
+        let paramIndex = 1;
+        
+        if (name !== undefined) {
+            updates.push(`name = $${paramIndex++}`);
+            values.push(name);
+        }
+        if (url !== undefined) {
+            updates.push(`url = $${paramIndex++}`);
+            values.push(url);
+        }
+        if (username !== undefined) {
+            updates.push(`username = $${paramIndex++}`);
+            values.push(username);
+        }
+        if (password !== undefined) {
+            updates.push(`password = $${paramIndex++}`);
+            values.push(password);
+        }
+        if (enabled !== undefined) {
+            updates.push(`enabled = $${paramIndex++}`);
+            values.push(enabled);
+        }
+        
+        if (updates.length === 0) {
+            return res.status(400).json({ error: 'No fields to update' });
+        }
+        
+        values.push(req.userId, id);
+        
+        const result = await pool.query(
+            `UPDATE haudai_credentials SET ${updates.join(', ')} WHERE user_id = $${paramIndex++} AND id = $${paramIndex++} RETURNING *`,
+            values
+        );
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Hậu đài not found' });
+        }
+        
+        res.json({ success: true, message: 'Hậu đài updated' });
+    } catch (error) {
+        console.error('Update haudai error:', error);
+        res.status(500).json({ error: 'Failed to update haudai' });
+    }
+});
+
+// Delete hậu đài credentials
+app.delete('/api/haudai/:id', authenticateApiKey, async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        const result = await pool.query(
+            'DELETE FROM haudai_credentials WHERE user_id = $1 AND id = $2 RETURNING *',
+            [req.userId, id]
+        );
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Hậu đài not found' });
+        }
+        
+        res.json({ success: true, message: 'Hậu đài deleted' });
+    } catch (error) {
+        console.error('Delete haudai error:', error);
+        res.status(500).json({ error: 'Failed to delete haudai' });
+    }
+});
+
+// Test hậu đài connection
+app.post('/api/haudai/test', authenticateApiKey, async (req, res) => {
+    try {
+        const { url, username, password } = req.body;
+        
+        if (!url || !username || !password) {
+            return res.status(400).json({ error: 'URL, username, and password required' });
+        }
+        
+        const SHARED_BOT_URL = process.env.SHARED_BOT_URL || 'http://localhost:5000';
+        
+        // Test connection via shared bot
+        const botResponse = await fetch(`${SHARED_BOT_URL}/check`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                user_id: req.userId,
+                haudai_url: url,
+                haudai_username: username,
+                haudai_password: password,
+                player: 'test_connection'
+            }),
+            timeout: 15000
+        });
+        
+        if (botResponse.ok) {
+            const data = await botResponse.json();
+            if (data.error) {
+                res.json({ success: false, message: data.error });
+            } else {
+                res.json({ success: true, message: 'Connection successful', data });
+            }
+        } else {
+            res.json({ success: false, message: `Bot returned status ${botResponse.status}` });
+        }
+    } catch (error) {
+        console.error('Test haudai error:', error);
+        res.json({ success: false, message: `Connection failed: ${error.message}` });
     }
 });
 
